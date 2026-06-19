@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}点位管理 - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">点位管理</li>
+    </ol>
+</nav>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">所属路段</label>
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for road in roads %}
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"s" %}selected{% endif %}>{{ road.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">点位类型</label>
+            <select name="type" class="form-select">
+                <option value="">全部类型</option>
+                <option value="stone_step" {% if type_filter == "stone_step" %}selected{% endif %}>石阶</option>
+                <option value="road_stele" {% if type_filter == "road_stele" %}selected{% endif %}>路碑</option>
+                <option value="drainage" {% if type_filter == "drainage" %}selected{% endif %}>排水沟</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">风险等级</label>
+            <select name="risk" class="form-select">
+                <option value="">全部</option>
+                <option value="high" {% if risk_filter == "high" %}selected{% endif %}>高风险</option>
+            </select>
+        </div>
+        <div class="col-md-3 text-end">
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{% url 'roads:point_list' %}" class="btn btn-outline-secondary">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>点位管理</h4>
+    <a href="{% url 'roads:point_create' %}" class="btn btn-primary">+ 新增点位</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>编号</th>
+                    <th>名称</th>
+                    <th>所属路段</th>
+                    <th>类型</th>
+                    <th>坐标</th>
+                    <th>风险状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for point in points %}
+                <tr>
+                    <td><code>{{ point.code }}</code></td>
+                    <td><a href="{% url 'roads:point_detail' point.pk %}"><strong>{{ point.name }}</strong></a></td>
+                    <td>{{ point.road_section.name }}</td>
+                    <td><span class="badge badge-type-{{ point.point_type }}">{{ point.get_point_type_display }}</span></td>
+                    <td><small>{{ point.latitude|floatformat:5 }}, {{ point.longitude|floatformat:5 }}</small></td>
+                    <td>
+                        {% if point.is_high_risk %}
+                        <span class="risk-indicator risk-high">⚠️ 高风险</span>
+                        {% else %}
+                        <span class="risk-indicator risk-normal">正常</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'roads:point_detail' point.pk %}" class="btn btn-sm btn-outline-primary">详情</a>
+                        <a href="{% url 'roads:inspection_create' %}" class="btn btn-sm btn-outline-success">巡查</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted">暂无点位数据</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

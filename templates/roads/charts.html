@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block title %}统计图表 - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="filter-bar">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">选择路段</label>
+                    <select name="road_id" class="form-select">
+                        <option value="">全部路段对比</option>
+                        {% for road in roads %}
+                        <option value="{{ road.pk }}" {% if selected_road_id == road.pk %}selected{% endif %}>{{ road.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">对比月份数</label>
+                    <select name="months" class="form-select">
+                        <option value="3" {% if months_count == 3 %}selected{% endif %}>最近 3 个月</option>
+                        <option value="6" {% if months_count == 6 %}selected{% endif %}>最近 6 个月</option>
+                        <option value="12" {% if months_count == 12 %}selected{% endif %}>最近 12 个月</option>
+                    </select>
+                </div>
+                <div class="col-md-5 text-end">
+                    <button type="submit" class="btn btn-primary">生成图表</button>
+                    <a href="{% url 'roads:charts' %}" class="btn btn-outline-secondary">重置</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">月度平均磨损等级趋势</div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="wearTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">各磨损等级月度数量分布</div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="wearDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const labels = {{ labels|safe }};
+    const roadData = {{ road_data|safe }};
+    const wearCountData = {{ wear_count_data|safe }};
+    const wearLevelChoices = {{ wear_level_choices|safe }};
+
+    const colors = [
+        '#5c4033',
+        '#8b7355',
+        '#d4a574',
+        '#28a745',
+        '#dc3545',
+        '#fd7e14',
+        '#17a2b8',
+        '#6f42c1'
+    ];
+
+    const trendDatasets = roadData.map((road, idx) => ({
+        label: road.name,
+        data: road.data,
+        borderColor: colors[idx % colors.length],
+        backgroundColor: colors[idx % colors.length] + '33',
+        tension: 0.3,
+        fill: false,
+        pointRadius: 5,
+        pointHoverRadius: 7
+    }));
+
+    new Chart(document.getElementById('wearTrendChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: trendDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const val = context.parsed.y;
+                            let levelText = '';
+                            if (val >= 3.5) levelText = ' (严重)';
+                            else if (val >= 2.5) levelText = ' (较重)';
+                            else if (val >= 1.5) levelText = ' (一般)';
+                            else if (val > 0) levelText = ' (轻微)';
+                            return context.dataset.label + ': ' + val.toFixed(2) + levelText;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 4.5,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            const map = {0: '无', 1: '轻微', 2: '一般', 3: '较重', 4: '严重'};
+                            return map[value] || value;
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: '平均磨损等级'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '月份'
+                    }
+                }
+            }
+        }
+    });
+
+    const distColors = {
+        1: '#28a745',
+        2: '#ffc107',
+        3: '#fd7e14',
+        4: '#dc3545'
+    };
+
+    const distDatasets = Object.entries(wearCountData).map(([level, data]) => ({
+        label: wearLevelChoices[parseInt(level)],
+        data: data,
+        backgroundColor: distColors[parseInt(level)] || '#6c757d',
+        borderRadius: 4
+    }));
+
+    new Chart(document.getElementById('wearDistributionChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: distDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '巡查记录数'
+                    },
+                    ticks: {
+                        precision: 0
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '月份'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

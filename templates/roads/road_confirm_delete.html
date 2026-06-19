@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}确认删除 - {{ road.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:road_list' %}">路段档案</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:road_detail' road.pk %}">{{ road.name }}</a></li>
+        <li class="breadcrumb-item active">删除</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card text-center">
+            <div class="card-header text-danger">⚠️ 确认删除</div>
+            <div class="card-body">
+                <p class="mb-3">您确定要删除路段 <strong>{{ road.code }} - {{ road.name }}</strong> 吗？</p>
+                <div class="alert alert-warning">
+                    <p class="mb-0">删除后，该路段下的所有点位和巡查记录也将被删除，此操作不可恢复！</p>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <a href="{% url 'roads:road_detail' road.pk %}" class="btn btn-outline-secondary">取消</a>
+                    <button type="submit" class="btn btn-danger">确认删除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

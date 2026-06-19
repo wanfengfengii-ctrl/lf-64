@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}巡查记录 - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">巡查记录</li>
+    </ol>
+</nav>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">点位</label>
+            <select name="point" class="form-select">
+                <option value="">全部点位</option>
+                {% for p in points %}
+                <option value="{{ p.pk }}" {% if point_filter == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.code }} - {{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">磨损等级</label>
+            <select name="level" class="form-select">
+                <option value="">全部等级</option>
+                {% for val, label in wear_level_choices.items %}
+                <option value="{{ val }}" {% if level_filter == val|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">处理状态</label>
+            <select name="handled" class="form-select">
+                <option value="">全部</option>
+                <option value="yes" {% if handled_filter == "yes" %}selected{% endif %}>已处理</option>
+                <option value="no" {% if handled_filter == "no" %}selected{% endif %}>未处理</option>
+            </select>
+        </div>
+        <div class="col-md-3 text-end">
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{% url 'roads:inspection_list' %}" class="btn btn-outline-secondary">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>巡查记录</h4>
+    <a href="{% url 'roads:inspection_create' %}" class="btn btn-primary">+ 新增巡查</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>点位</th>
+                    <th>所属路段</th>
+                    <th>日期</th>
+                    <th>巡查员</th>
+                    <th>磨损等级</th>
+                    <th>优先级</th>
+                    <th>处理状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insp in inspections %}
+                <tr>
+                    <td><a href="{% url 'roads:point_detail' insp.point.pk %}"><code>{{ insp.point.code }}</code> {{ insp.point.name }}</a></td>
+                    <td>{{ insp.point.road_section.name }}</td>
+                    <td>{{ insp.inspection_date }}</td>
+                    <td>{{ insp.inspector }}</td>
+                    <td><span class="badge badge-wear-{{ insp.wear_level }}">{{ insp.get_wear_level_display }}</span></td>
+                    <td><span class="badge badge-priority-{{ insp.get_priority }}">{{ insp.get_priority }}</span></td>
+                    <td>
+                        {% if insp.handled %}
+                        <span class="text-success">✓ 已处理</span>
+                        {% else %}
+                        <span class="text-danger">✗ 未处理</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'roads:inspection_detail' insp.pk %}" class="btn btn-sm btn-outline-primary">详情</a>
+                        <a href="{% url 'roads:inspection_edit' insp.pk %}" class="btn btn-sm btn-outline-secondary">编辑</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center text-muted">暂无巡查记录</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

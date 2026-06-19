@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ point.name }} - 点位详情{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:point_list' %}">点位管理</a></li>
+        <li class="breadcrumb-item active">{{ point.name }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>{{ point.code }} - {{ point.name }}</h4>
+    <div>
+        <a href="{% url 'roads:point_edit' point.pk %}" class="btn btn-outline-secondary">编辑点位</a>
+        <a href="{% url 'roads:inspection_create' %}" class="btn btn-primary">+ 新增巡查</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">点位基本信息</div>
+            <div class="card-body">
+                <div class="info-section">
+                    <h6>基础信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">点位编号</span>
+                        <span class="info-value"><code>{{ point.code }}</code></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">点位名称</span>
+                        <span class="info-value">{{ point.name }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">点位类型</span>
+                        <span class="info-value"><span class="badge badge-type-{{ point.point_type }}">{{ point.get_point_type_display }}</span></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">所属路段</span>
+                        <span class="info-value"><a href="{% url 'roads:road_detail' point.road_section.pk %}">{{ point.road_section.name }}</a></span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h6>位置坐标</h6>
+                    <div class="info-row">
+                        <span class="info-label">纬度</span>
+                        <span class="info-value">{{ point.latitude }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">经度</span>
+                        <span class="info-value">{{ point.longitude }}</span>
+                    </div>
+                </div>
+
+                {% if point.description %}
+                <div class="info-section">
+                    <h6>点位描述</h6>
+                    <p class="text-muted mb-0" style="white-space: pre-wrap;">{{ point.description }}</p>
+                </div>
+                {% endif %}
+
+                <div class="info-section">
+                    <h6>当前状态</h6>
+                    <div class="info-row">
+                        <span class="info-label">最新磨损等级</span>
+                        <span class="info-value">
+                            {% with latest=point.get_latest_inspection %}
+                            {% if latest %}
+                            <span class="badge badge-wear-{{ latest.wear_level }}">{{ latest.get_wear_level_display }}</span>
+                            {% else %}
+                            <span class="text-muted">暂无巡查记录</span>
+                            {% endif %}
+                            {% endwith %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">风险状态</span>
+                        <span class="info-value">
+                            {% if point.is_high_risk %}
+                            <span class="risk-indicator risk-high">⚠️ 高风险</span>
+                            {% else %}
+                            <span class="risk-indicator risk-normal">正常</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <a href="{% url 'roads:point_delete' point.pk %}" class="btn btn-outline-danger btn-sm w-100 mt-3">删除此点位</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>巡查记录 ({{ inspections|length }})</span>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>巡查员</th>
+                            <th>磨损等级</th>
+                            <th>处理状态</th>
+                            <th>优先级</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for insp in inspections %}
+                        <tr>
+                            <td>{{ insp.inspection_date }}</td>
+                            <td>{{ insp.inspector }}</td>
+                            <td><span class="badge badge-wear-{{ insp.wear_level }}">{{ insp.get_wear_level_display }}</span></td>
+                            <td>
+                                {% if insp.handled %}
+                                <span class="text-success">✓ 已处理</span>
+                                {% else %}
+                                <span class="text-danger">✗ 未处理</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge badge-priority-{{ insp.get_priority }}">{{ insp.get_priority }}</span></td>
+                            <td>
+                                <a href="{% url 'roads:inspection_detail' insp.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted">暂无巡查记录</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

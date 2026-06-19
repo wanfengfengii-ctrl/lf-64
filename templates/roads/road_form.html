@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'create' %}新增路段{% else %}编辑路段{% endif %} - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:road_list' %}">路段档案</a></li>
+        <li class="breadcrumb-item active">{% if mode == 'create' %}新增路段{% else %}编辑路段{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">{% if mode == 'create' %}新增路段{% else %}编辑路段{% endif %}</div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.name.label }} <span class="text-danger">*</span></label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.code.label }} <span class="text-danger">*</span></label>
+                                {{ form.code }}
+                                {% if form.code.errors %}
+                                <div class="text-danger small">{{ form.code.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.start_location.label }} <span class="text-danger">*</span></label>
+                                {{ form.start_location }}
+                                {% if form.start_location.errors %}
+                                <div class="text-danger small">{{ form.start_location.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.end_location.label }} <span class="text-danger">*</span></label>
+                                {{ form.end_location }}
+                                {% if form.end_location.errors %}
+                                <div class="text-danger small">{{ form.end_location.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.length_km.label }} <span class="text-danger">*</span></label>
+                                {{ form.length_km }}
+                                {% if form.length_km.errors %}
+                                <div class="text-danger small">{{ form.length_km.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.status.label }} <span class="text-danger">*</span></label>
+                                {{ form.status }}
+                                {% if form.status.errors %}
+                                <div class="text-danger small">{{ form.status.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.historical_info.label }}</label>
+                        {{ form.historical_info }}
+                        {% if form.historical_info.errors %}
+                        <div class="text-danger small">{{ form.historical_info.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-end">
+                        {% if mode == 'edit' %}
+                        <a href="{% url 'roads:road_detail' road.pk %}" class="btn btn-outline-secondary">取消</a>
+                        {% else %}
+                        <a href="{% url 'roads:road_list' %}" class="btn btn-outline-secondary">取消</a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">{% if mode == 'create' %}创建{% else %}保存{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

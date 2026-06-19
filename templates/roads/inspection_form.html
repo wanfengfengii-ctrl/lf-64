@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'create' %}新增巡查记录{% else %}编辑巡查记录{% endif %} - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:inspection_list' %}">巡查记录</a></li>
+        <li class="breadcrumb-item active">{% if mode == 'create' %}新增巡查记录{% else %}编辑巡查记录{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">{% if mode == 'create' %}新增巡查记录{% else %}编辑巡查记录{% endif %}</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.point.label }} <span class="text-danger">*</span></label>
+                                {{ form.point }}
+                                {% if form.point.errors %}
+                                <div class="text-danger small">{{ form.point.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.inspection_date.label }} <span class="text-danger">*</span></label>
+                                {{ form.inspection_date }}
+                                {% if form.inspection_date.errors %}
+                                <div class="text-danger small">{{ form.inspection_date.errors|join:", " }}</div>
+                                <div class="text-muted small">巡查日期不能晚于当前日期</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.inspector.label }} <span class="text-danger">*</span></label>
+                                {{ form.inspector }}
+                                {% if form.inspector.errors %}
+                                <div class="text-danger small">{{ form.inspector.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.wear_level.label }} <span class="text-danger">*</span></label>
+                                {{ form.wear_level }}
+                                {% if form.wear_level.errors %}
+                                <div class="text-danger small">{{ form.wear_level.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.wear_description.label }}</label>
+                        {{ form.wear_description }}
+                        {% if form.wear_description.errors %}
+                        <div class="text-danger small">{{ form.wear_description.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.maintenance_suggestion.label }}
+                            <small class="text-warning" id="sugTip">（磨损等级为"严重"时必须填写）</small>
+                        </label>
+                        {{ form.maintenance_suggestion }}
+                        {% if form.maintenance_suggestion.errors %}
+                        <div class="text-danger small">{{ form.maintenance_suggestion.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-2">
+                            <div class="mb-3 form-check mt-4">
+                                {{ form.handled }}
+                                <label class="form-check-label ms-2">{{ form.handled.label }}</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.handled_date.label }}</label>
+                                {{ form.handled_date }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        {% if mode == 'edit' %}
+                        <a href="{% url 'roads:inspection_detail' inspection.pk %}" class="btn btn-outline-secondary">取消</a>
+                        {% else %}
+                        <a href="{% url 'roads:inspection_list' %}" class="btn btn-outline-secondary">取消</a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">{% if mode == 'create' %}创建{% else %}保存{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const wearLevelSelect = document.querySelector('#id_wear_level');
+    const suggestionField = document.querySelector('#id_maintenance_suggestion');
+
+    function checkSuggestionRequired() {
+        if (wearLevelSelect && suggestionField) {
+            if (parseInt(wearLevelSelect.value) === 4) {
+                suggestionField.required = true;
+                suggestionField.style.borderColor = '#dc3545';
+            } else {
+                suggestionField.required = false;
+                suggestionField.style.borderColor = '';
+            }
+        }
+    }
+
+    if (wearLevelSelect) {
+        wearLevelSelect.addEventListener('change', checkSuggestionRequired);
+        checkSuggestionRequired();
+    }
+});
+</script>
+{% endblock %}

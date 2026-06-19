@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}地图展示 - 古驿道磨损记录系统{% endblock %}
+
+{% block map_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="filter-bar">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-check-label">
+                        <input type="checkbox" name="high_risk" value="1" {% if high_risk_filter %}checked{% endif %} class="form-check-input">
+                        只显示高风险点位
+                    </label>
+                </div>
+                <div class="col-md-8 text-end">
+                    <button type="submit" class="btn btn-primary">筛选</button>
+                    <a href="{% url 'roads:map' %}" class="btn btn-outline-secondary">重置</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-9">
+        <div id="map"></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">图例</div>
+            <div class="card-body">
+                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#28a745;margin-right:8px;"></span>正常/轻微磨损</div>
+                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ffc107;margin-right:8px;"></span>一般磨损</div>
+                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#fd7e14;margin-right:8px;"></span>较重磨损</div>
+                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#dc3545;margin-right:8px;"></span>严重磨损</div>
+                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#6c757d;margin-right:8px;"></span>无巡查记录</div>
+                <hr>
+                <p class="text-muted small mb-0">点击标记可查看点位详细信息</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">点位类型</div>
+            <div class="card-body">
+                <div class="mb-2"><span class="badge badge-type-stone_step">石阶</span></div>
+                <div class="mb-2"><span class="badge badge-type-road_stele">路碑</span></div>
+                <div><span class="badge badge-type-drainage">排水沟</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">点位统计</div>
+            <div class="card-body">
+                <p class="mb-2">共显示 <strong>{{ points|length }}</strong> 个点位</p>
+                <a href="{% url 'roads:point_list' %}" class="btn btn-sm btn-outline-primary w-100">点位列表</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const map = L.map('map').setView([30.0, 110.0], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    const highRiskFilter = {% if high_risk_filter %}true{% else %}false{% endif %};
+    const apiUrl = "{% url 'roads:api_points_geo' %}" + (highRiskFilter ? '?high_risk=1' : '');
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            const markers = [];
+
+            data.features.forEach(feature => {
+                const props = feature.properties;
+                const [lon, lat] = feature.geometry.coordinates;
+
+                let color = '#6c757d';
+                if (props.wear_level === 1) color = '#28a745';
+                else if (props.wear_level === 2) color = '#ffc107';
+                else if (props.wear_level === 3) color = '#fd7e14';
+                else if (props.wear_level === 4) color = '#dc3545';
+
+                const marker = L.circleMarker([lat, lon], {
+                    radius: props.is_high_risk ? 10 : 7,
+                    fillColor: color,
+                    color: props.is_high_risk ? '#000' : color,
+                    weight: props.is_high_risk ? 2 : 1,
+                    opacity: 1,
+                    fillOpacity: 0.85
+                });
+
+                const popupContent = `
+                    <h6>${props.code} - ${props.name}</h6>
+                    <div class="popup-row">
+                        <span class="popup-label">类型</span>
+                        <span>${props.point_type_display}</span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-label">路段</span>
+                        <span>${props.road_section}</span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-label">磨损等级</span>
+                        <span style="color:${color};font-weight:600;">${props.wear_level_display}</span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-label">状态</span>
+                        <span>${props.handled ? '<span style="color:#28a745;">已处理</span>' : '<span style="color:#dc3545;">未处理</span>'}</span>
+                    </div>
+                    <div class="mt-2">
+                        <a href="/points/${props.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.addTo(map);
+                markers.push(marker);
+            });
+
+            if (markers.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        });
+});
+</script>
+{% endblock %}

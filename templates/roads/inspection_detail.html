@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}巡查记录详情{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:inspection_list' %}">巡查记录</a></li>
+        <li class="breadcrumb-item active">详情</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>巡查记录详情</h4>
+    <div>
+        <a href="{% url 'roads:inspection_edit' inspection.pk %}" class="btn btn-outline-secondary">编辑</a>
+        <a href="{% url 'roads:point_detail' inspection.point.pk %}" class="btn btn-primary">查看点位</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">巡查信息</div>
+            <div class="card-body">
+                <div class="info-section">
+                    <h6>点位信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">点位编号</span>
+                        <span class="info-value"><a href="{% url 'roads:point_detail' inspection.point.pk %}"><code>{{ inspection.point.code }}</code></a></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">点位名称</span>
+                        <span class="info-value">{{ inspection.point.name }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">所属路段</span>
+                        <span class="info-value"><a href="{% url 'roads:road_detail' inspection.point.road_section.pk %}">{{ inspection.point.road_section.name }}</a></span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h6>巡查信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">巡查日期</span>
+                        <span class="info-value">{{ inspection.inspection_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">巡查人员</span>
+                        <span class="info-value">{{ inspection.inspector }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">磨损等级</span>
+                        <span class="info-value"><span class="badge badge-wear-{{ inspection.wear_level }}">{{ inspection.get_wear_level_display }}</span></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">优先级</span>
+                        <span class="info-value"><span class="badge badge-priority-{{ inspection.get_priority }}">{{ inspection.get_priority }}</span></span>
+                    </div>
+                </div>
+
+                {% if inspection.wear_description %}
+                <div class="info-section">
+                    <h6>磨损描述</h6>
+                    <p style="white-space: pre-wrap;">{{ inspection.wear_description }}</p>
+                </div>
+                {% endif %}
+
+                {% if inspection.maintenance_suggestion %}
+                <div class="info-section">
+                    <h6>维护建议</h6>
+                    <div class="alert alert-info" style="white-space: pre-wrap;">{{ inspection.maintenance_suggestion }}</div>
+                </div>
+                {% endif %}
+
+                <div class="info-section">
+                    <h6>处理状态</h6>
+                    <div class="info-row">
+                        <span class="info-label">是否处理</span>
+                        <span class="info-value">
+                            {% if inspection.handled %}
+                            <span class="text-success fw-bold">✓ 已处理</span>
+                            {% else %}
+                            <span class="text-danger fw-bold">✗ 未处理</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% if inspection.handled_date %}
+                    <div class="info-row">
+                        <span class="info-label">处理日期</span>
+                        <span class="info-value">{{ inspection.handled_date }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <a href="{% url 'roads:inspection_delete' inspection.pk %}" class="btn btn-outline-danger btn-sm w-100 mt-3">删除此记录</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

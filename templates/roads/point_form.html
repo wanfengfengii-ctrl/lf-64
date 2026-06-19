@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'create' %}新增点位{% else %}编辑点位{% endif %} - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:point_list' %}">点位管理</a></li>
+        <li class="breadcrumb-item active">{% if mode == 'create' %}新增点位{% else %}编辑点位{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">{% if mode == 'create' %}新增点位{% else %}编辑点位{% endif %}</div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.road_section.label }} <span class="text-danger">*</span></label>
+                                {{ form.road_section }}
+                                {% if form.road_section.errors %}
+                                <div class="text-danger small">{{ form.road_section.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.code.label }} <span class="text-danger">*</span></label>
+                                {{ form.code }}
+                                {% if form.code.errors %}
+                                <div class="text-danger small">{{ form.code.errors|join:", " }}</div>
+                                <div class="text-muted small">点位编号不能重复</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.name.label }} <span class="text-danger">*</span></label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.point_type.label }} <span class="text-danger">*</span></label>
+                                {{ form.point_type }}
+                                {% if form.point_type.errors %}
+                                <div class="text-danger small">{{ form.point_type.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.latitude.label }} <span class="text-danger">*</span></label>
+                                {{ form.latitude }}
+                                {% if form.latitude.errors %}
+                                <div class="text-danger small">{{ form.latitude.errors|join:", " }}</div>
+                                {% else %}
+                                <div class="text-muted small">范围: -90 到 90</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.longitude.label }} <span class="text-danger">*</span></label>
+                                {{ form.longitude }}
+                                {% if form.longitude.errors %}
+                                <div class="text-danger small">{{ form.longitude.errors|join:", " }}</div>
+                                {% else %}
+                                <div class="text-muted small">范围: -180 到 180</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="text-danger small">{{ form.description.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-end">
+                        {% if mode == 'edit' %}
+                        <a href="{% url 'roads:point_detail' point.pk %}" class="btn btn-outline-secondary">取消</a>
+                        {% else %}
+                        <a href="{% url 'roads:point_list' %}" class="btn btn-outline-secondary">取消</a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">{% if mode == 'create' %}创建{% else %}保存{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

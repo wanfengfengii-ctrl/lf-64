@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}路段档案 - 古驿道磨损记录系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">路段档案</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>路段档案</h4>
+    <a href="{% url 'roads:road_create' %}" class="btn btn-primary">+ 新增路段</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>编号</th>
+                    <th>名称</th>
+                    <th>起点</th>
+                    <th>终点</th>
+                    <th>长度</th>
+                    <th>点位数量</th>
+                    <th>未处理严重</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for road in roads %}
+                <tr>
+                    <td><code>{{ road.code }}</code></td>
+                    <td><a href="{% url 'roads:road_detail' road.pk %}"><strong>{{ road.name }}</strong></a></td>
+                    <td>{{ road.start_location }}</td>
+                    <td>{{ road.end_location }}</td>
+                    <td>{{ road.length_km }} km</td>
+                    <td><span class="badge bg-secondary">{{ road.point_count }}</span></td>
+                    <td>
+                        {% if road.unhandled_critical > 0 %}
+                        <span class="badge badge-wear-4">{{ road.unhandled_critical }} 个</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-status-{{ road.status }}">{{ road.get_status_display }}</span></td>
+                    <td>
+                        <a href="{% url 'roads:road_detail' road.pk %}" class="btn btn-sm btn-outline-primary">详情</a>
+                        <a href="{% url 'roads:road_edit' road.pk %}" class="btn btn-sm btn-outline-secondary">编辑</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted">暂无路段记录，点击"新增路段"开始添加</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

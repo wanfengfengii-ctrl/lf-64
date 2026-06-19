@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ road.name }} - 路段详情{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:road_list' %}">路段档案</a></li>
+        <li class="breadcrumb-item active">{{ road.name }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>{{ road.code }} - {{ road.name }}</h4>
+    <div>
+        <a href="{% url 'roads:road_edit' road.pk %}" class="btn btn-outline-secondary">编辑路段</a>
+        <a href="{% url 'roads:point_create' %}" class="btn btn-primary">+ 新增点位</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">路段基本信息</div>
+            <div class="card-body">
+                <div class="info-section">
+                    <h6>基础信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">路段编号</span>
+                        <span class="info-value"><code>{{ road.code }}</code></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">路段名称</span>
+                        <span class="info-value">{{ road.name }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">路段状态</span>
+                        <span class="info-value"><span class="badge badge-status-{{ road.status }}">{{ road.get_status_display }}</span></span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h6>位置信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">起点</span>
+                        <span class="info-value">{{ road.start_location }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">终点</span>
+                        <span class="info-value">{{ road.end_location }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">长度</span>
+                        <span class="info-value">{{ road.length_km }} 公里</span>
+                    </div>
+                </div>
+
+                {% if road.historical_info %}
+                <div class="info-section">
+                    <h6>历史背景</h6>
+                    <p class="text-muted mb-0" style="white-space: pre-wrap;">{{ road.historical_info }}</p>
+                </div>
+                {% endif %}
+
+                <div class="info-section">
+                    <h6>系统信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">创建时间</span>
+                        <span class="info-value">{{ road.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">更新时间</span>
+                        <span class="info-value">{{ road.updated_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">未处理严重磨损</span>
+                        <span class="info-value">
+                            {% with cnt=road.get_unhandled_critical_count %}
+                            {% if cnt > 0 %}
+                            <span class="badge badge-wear-4">{{ cnt }} 个点位</span>
+                            {% else %}
+                            <span class="text-success">无</span>
+                            {% endif %}
+                            {% endwith %}
+                        </span>
+                    </div>
+                </div>
+
+                <a href="{% url 'roads:road_delete' road.pk %}" class="btn btn-outline-danger btn-sm w-100 mt-3">删除此路段</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>点位列表 ({{ points|length }})</span>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>编号</th>
+                            <th>名称</th>
+                            <th>类型</th>
+                            <th>风险状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for point in points %}
+                        <tr>
+                            <td><code>{{ point.code }}</code></td>
+                            <td><a href="{% url 'roads:point_detail' point.pk %}">{{ point.name }}</a></td>
+                            <td><span class="badge badge-type-{{ point.point_type }}">{{ point.get_point_type_display }}</span></td>
+                            <td>
+                                {% if point.has_critical > 0 %}
+                                <span class="risk-indicator risk-high">⚠️ 高风险</span>
+                                {% else %}
+                                <span class="risk-indicator risk-normal">正常</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'roads:point_detail' point.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                                <a href="{% url 'roads:inspection_create' %}" class="btn btn-sm btn-outline-success">巡查</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center text-muted">暂无点位数据</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
