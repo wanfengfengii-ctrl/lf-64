@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.db.models import Count, Avg, Q
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, date
 from collections import defaultdict
@@ -227,8 +228,9 @@ def api_points_geo(request):
 
     features = []
     for point in points:
+        worst = point.get_worst_unhandled_inspection()
         latest = point.get_latest_inspection()
-        wear_level = latest.wear_level if latest else None
+        wear_level = worst.wear_level if worst else None
         is_high = point.is_high_risk()
 
         features.append({
@@ -246,9 +248,12 @@ def api_points_geo(request):
                 'road_section': point.road_section.name,
                 'road_section_id': point.road_section.id,
                 'wear_level': wear_level,
-                'wear_level_display': dict(WEAR_LEVEL_CHOICES).get(wear_level, '无记录'),
+                'wear_level_display': dict(WEAR_LEVEL_CHOICES).get(wear_level, '无未处理记录'),
                 'is_high_risk': is_high,
-                'handled': latest.handled if latest else True,
+                'handled': worst is None,
+                'has_latest': latest is not None,
+                'latest_wear_level': latest.wear_level if latest else None,
+                'latest_wear_display': dict(WEAR_LEVEL_CHOICES).get(latest.wear_level, '无记录') if latest else '无记录',
             }
         })
 
@@ -282,12 +287,7 @@ def road_create(request):
 
 def road_detail(request, pk):
     road = get_object_or_404(RoadSection.objects.prefetch_related('points', 'points__inspections'), pk=pk)
-    points = road.points.annotate(
-        has_critical=Count('inspections', filter=Q(
-            inspections__wear_level=4,
-            inspections__handled=False
-        ))
-    ).all()
+    points = road.points.all()
     return render(request, 'roads/road_detail.html', {'road': road, 'points': points})
 
 
@@ -348,8 +348,15 @@ def point_create(request):
     if request.method == 'POST':
         form = PointForm(request.POST)
         if form.is_valid():
-            point = form.save()
-            return redirect('roads:point_detail', pk=point.pk)
+            try:
+                point = form.save(commit=False)
+                point.full_clean()
+                point = form.save()
+                return redirect('roads:point_detail', pk=point.pk)
+            except ValidationError as e:
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
     else:
         form = PointForm()
     return render(request, 'roads/point_form.html', {'form': form, 'mode': 'create'})
@@ -370,8 +377,15 @@ def point_edit(request, pk):
     if request.method == 'POST':
         form = PointForm(request.POST, instance=point)
         if form.is_valid():
-            form.save()
-            return redirect('roads:point_detail', pk=point.pk)
+            try:
+                p = form.save(commit=False)
+                p.full_clean()
+                form.save()
+                return redirect('roads:point_detail', pk=point.pk)
+            except ValidationError as e:
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
     else:
         form = PointForm(instance=point)
     return render(request, 'roads/point_form.html', {'form': form, 'point': point, 'mode': 'edit'})
@@ -419,8 +433,15 @@ def inspection_create(request):
     if request.method == 'POST':
         form = InspectionRecordForm(request.POST)
         if form.is_valid():
-            inspection = form.save()
-            return redirect('roads:inspection_detail', pk=inspection.pk)
+            try:
+                insp = form.save(commit=False)
+                insp.full_clean()
+                insp = form.save()
+                return redirect('roads:inspection_detail', pk=insp.pk)
+            except ValidationError as e:
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
     else:
         form = InspectionRecordForm(initial={'inspection_date': timezone.now().date()})
     return render(request, 'roads/inspection_form.html', {'form': form, 'mode': 'create'})
@@ -442,8 +463,15 @@ def inspection_edit(request, pk):
     if request.method == 'POST':
         form = InspectionRecordForm(request.POST, instance=inspection)
         if form.is_valid():
-            form.save()
-            return redirect('roads:inspection_detail', pk=inspection.pk)
+            try:
+                insp = form.save(commit=False)
+                insp.full_clean()
+                form.save()
+                return redirect('roads:inspection_detail', pk=inspection.pk)
+            except ValidationError as e:
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
     else:
         form = InspectionRecordForm(instance=inspection)
     return render(request, 'roads/inspection_form.html', {'form': form, 'inspection': inspection, 'mode': 'edit'})

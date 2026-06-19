@@ -66,11 +66,28 @@
                 <div class="info-section">
                     <h6>当前状态</h6>
                     <div class="info-row">
-                        <span class="info-label">最新磨损等级</span>
+                        <span class="info-label">未处理最严重</span>
+                        <span class="info-value">
+                            {% with worst=point.get_worst_unhandled_inspection %}
+                            {% if worst %}
+                            <span class="badge badge-wear-{{ worst.wear_level }}">{{ worst.get_wear_level_display }}</span>
+                            {% else %}
+                            <span class="text-success">✓ 全部已处理</span>
+                            {% endif %}
+                            {% endwith %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">最新巡查结果</span>
                         <span class="info-value">
                             {% with latest=point.get_latest_inspection %}
                             {% if latest %}
                             <span class="badge badge-wear-{{ latest.wear_level }}">{{ latest.get_wear_level_display }}</span>
+                            {% if latest.handled %}
+                            <small class="text-success ms-1">(已处理)</small>
+                            {% else %}
+                            <small class="text-warning ms-1">(未处理)</small>
+                            {% endif %}
                             {% else %}
                             <span class="text-muted">暂无巡查记录</span>
                             {% endif %}

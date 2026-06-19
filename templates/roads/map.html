@@ -112,14 +112,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="popup-label">路段</span>
                         <span>${props.road_section}</span>
                     </div>
-                    <div class="popup-row">
-                        <span class="popup-label">磨损等级</span>
-                        <span style="color:${color};font-weight:600;">${props.wear_level_display}</span>
+                    <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
+                        <div class="popup-row">
+                            <span class="popup-label"><strong>未处理最严重</strong></span>
+                            <span style="color:${color};font-weight:600;">${props.wear_level_display}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">处理状态</span>
+                            <span>${props.handled ? '<span style="color:#28a745;">全部已处理</span>' : '<span style="color:#dc3545;">存在未处理</span>'}</span>
+                        </div>
                     </div>
-                    <div class="popup-row">
-                        <span class="popup-label">状态</span>
-                        <span>${props.handled ? '<span style="color:#28a745;">已处理</span>' : '<span style="color:#dc3545;">未处理</span>'}</span>
+                    ${props.has_latest ? `
+                    <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
+                        <div class="popup-row">
+                            <span class="popup-label">最新巡查结果</span>
+                            <span>${props.latest_wear_display}</span>
+                        </div>
                     </div>
+                    ` : ''}
                     <div class="mt-2">
                         <a href="/points/${props.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
                     </div>

@@ -113,11 +113,23 @@ class Point(models.Model):
             return latest.wear_level
         return None
 
+    def get_worst_unhandled_inspection(self):
+        return self.inspections.filter(handled=False).order_by('-wear_level', '-inspection_date').first()
+
+    def get_worst_unhandled_wear_level(self):
+        worst = self.get_worst_unhandled_inspection()
+        if worst:
+            return worst.wear_level
+        return None
+
     def is_high_risk(self):
-        latest = self.get_latest_inspection()
-        if latest and latest.wear_level >= 3 and not latest.handled:
+        worst = self.get_worst_unhandled_inspection()
+        if worst and worst.wear_level >= 3:
             return True
         return False
+
+    def has_unhandled_critical(self):
+        return self.inspections.filter(wear_level=4, handled=False).exists()
 
 
 class InspectionRecord(models.Model):
