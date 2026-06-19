@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Count, Avg, Q, Max, Min, F
+from django.db.models import Count, Avg, Q, Max, Min, F, Exists, OuterRef
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib import messages
@@ -23,18 +23,43 @@ from .forms import (
 )
 
 
+def get_high_risk_annotation():
+    return Exists(
+        InspectionRecord.objects.filter(
+            point_id=OuterRef('pk'),
+            handled=False,
+            wear_level__gte=3,
+        )
+    )
+
+
+def annotate_high_risk(queryset):
+    return queryset.annotate(
+        is_high_risk_annotated=get_high_risk_annotation(),
+        has_unhandled_critical_annotated=Exists(
+            InspectionRecord.objects.filter(
+                point_id=OuterRef('pk'),
+                handled=False,
+                wear_level=4,
+            )
+        ),
+        worst_unhandled_wear_annotated=Max(
+            'inspections__wear_level',
+            filter=Q(inspections__handled=False)
+        ),
+    )
+
+
 def dashboard(request):
     total_roads = RoadSection.objects.count()
     total_points = Point.objects.count()
     total_inspections = InspectionRecord.objects.count()
-    high_risk_points = Point.objects.filter(
-        inspections__wear_level__gte=3,
-        inspections__handled=False
-    ).distinct().count()
-    critical_points = Point.objects.filter(
-        inspections__wear_level=4,
-        inspections__handled=False
-    ).distinct()
+    high_risk_points = annotate_high_risk(Point.objects).filter(
+        is_high_risk_annotated=True
+    ).count()
+    critical_points = annotate_high_risk(Point.objects).filter(
+        has_unhandled_critical_annotated=True
+    )
 
     unread_alerts = Alert.objects.filter(is_read=False, is_resolved=False).count()
     critical_alerts = Alert.objects.filter(alert_level='critical', is_resolved=False).count()
@@ -260,19 +285,16 @@ def api_wear_data(request):
 
 def api_points_geo(request):
     high_risk = request.GET.get('high_risk', '0') == '1'
-    points = Point.objects.select_related('road_section').all()
+    points = annotate_high_risk(Point.objects.select_related('road_section').all())
     if high_risk:
-        points = points.filter(
-            inspections__wear_level__gte=3,
-            inspections__handled=False
-        ).distinct()
+        points = points.filter(is_high_risk_annotated=True)
 
     features = []
     for point in points:
-        worst = point.get_worst_unhandled_inspection()
+        worst_wear = point.worst_unhandled_wear_annotated
         latest = point.get_latest_inspection()
-        wear_level = worst.wear_level if worst else None
-        is_high = point.is_high_risk()
+        is_high = point.is_high_risk_annotated
+        wear_level = worst_wear if worst_wear else None
 
         features.append({
             'type': 'Feature',
@@ -290,8 +312,8 @@ def api_points_geo(request):
                 'road_section_id': point.road_section.id,
                 'wear_level': wear_level,
                 'wear_level_display': dict(WEAR_LEVEL_CHOICES).get(wear_level, '无未处理记录'),
-                'is_high_risk': is_high,
-                'handled': worst is None,
+                'is_high_risk': bool(is_high),
+                'handled': wear_level is None,
                 'has_latest': latest is not None,
                 'latest_wear_level': latest.wear_level if latest else None,
                 'latest_wear_display': dict(WEAR_LEVEL_CHOICES).get(latest.wear_level, '无记录') if latest else '无记录',
@@ -328,7 +350,7 @@ def road_create(request):
 
 def road_detail(request, pk):
     road = get_object_or_404(RoadSection.objects.prefetch_related('points', 'points__inspections'), pk=pk)
-    points = road.points.all()
+    points = annotate_high_risk(road.points.all()).order_by('code')
     return render(request, 'roads/road_detail.html', {'road': road, 'points': points})
 
 
@@ -357,17 +379,16 @@ def point_list(request):
     type_filter = request.GET.get('type')
     risk_filter = request.GET.get('risk')
 
-    points = Point.objects.select_related('road_section').all()
+    points = annotate_high_risk(
+        Point.objects.select_related('road_section').all()
+    )
 
     if road_filter:
         points = points.filter(road_section_id=road_filter)
     if type_filter:
         points = points.filter(point_type=type_filter)
     if risk_filter == 'high':
-        points = points.filter(
-            inspections__wear_level__gte=3,
-            inspections__handled=False
-        ).distinct()
+        points = points.filter(is_high_risk_annotated=True)
 
     points = points.annotate(
         latest_wear=Avg('inspections__wear_level')
@@ -390,22 +411,21 @@ def point_create(request):
         form = PointForm(request.POST)
         if form.is_valid():
             try:
-                point = form.save(commit=False)
-                point.full_clean()
                 point = form.save()
+                messages.success(request, f'点位 {point.code} 创建成功。')
                 return redirect('roads:point_detail', pk=point.pk)
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
+            except Exception as e:
+                form.add_error(None, f'保存失败：{e}')
     else:
         form = PointForm()
     return render(request, 'roads/point_form.html', {'form': form, 'mode': 'create'})
 
 
 def point_detail(request, pk):
-    point = get_object_or_404(Point.objects.select_related('road_section').prefetch_related(
-        'inspections', 'photos', 'task_orders', 'alerts'
+    point = get_object_or_404(annotate_high_risk(
+        Point.objects.select_related('road_section').prefetch_related(
+            'inspections', 'photos', 'task_orders', 'alerts'
+        )
     ), pk=pk)
     inspections = point.inspections.all().order_by('-inspection_date')
     photos = point.photos.all().order_by('-uploaded_at')[:12]
@@ -428,14 +448,11 @@ def point_edit(request, pk):
         form = PointForm(request.POST, instance=point)
         if form.is_valid():
             try:
-                p = form.save(commit=False)
-                p.full_clean()
                 form.save()
+                messages.success(request, f'点位 {point.code} 更新成功。')
                 return redirect('roads:point_detail', pk=point.pk)
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
+            except Exception as e:
+                form.add_error(None, f'保存失败：{e}')
     else:
         form = PointForm(instance=point)
     return render(request, 'roads/point_form.html', {'form': form, 'point': point, 'mode': 'edit'})
@@ -978,8 +995,10 @@ def api_points_geo_timeline(request):
     date_str = request.GET.get('date')
     high_risk = request.GET.get('high_risk', '0') == '1'
 
-    points = Point.objects.select_related('road_section').all()
-    if high_risk:
+    points = annotate_high_risk(Point.objects.select_related('road_section').all())
+    if high_risk and not date_str:
+        points = points.filter(is_high_risk_annotated=True)
+    elif high_risk and date_str:
         points = points.filter(
             inspections__wear_level__gte=3,
             inspections__handled=False
@@ -1006,14 +1025,15 @@ def api_points_geo_timeline(request):
             latest_wear_display = dict(WEAR_LEVEL_CHOICES).get(latest_wear, '无记录') if latest_at_time else '无记录'
             handled = unhandled_at_time is None
             wear_display = dict(WEAR_LEVEL_CHOICES).get(wear_level, '无未处理记录')
+            if high_risk and not is_high:
+                continue
         else:
-            worst = point.get_worst_unhandled_inspection()
+            wear_level = point.worst_unhandled_wear_annotated
+            is_high = bool(point.is_high_risk_annotated)
             latest = point.get_latest_inspection()
-            wear_level = worst.wear_level if worst else None
-            is_high = point.is_high_risk()
             latest_wear = latest.wear_level if latest else None
             latest_wear_display = dict(WEAR_LEVEL_CHOICES).get(latest_wear, '无记录') if latest else '无记录'
-            handled = worst is None
+            handled = wear_level is None
             wear_display = dict(WEAR_LEVEL_CHOICES).get(wear_level, '无未处理记录')
 
         features.append({
