@@ -4,24 +4,134 @@
 
 {% block map_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+@keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 1; }
+    80%, 100% { transform: scale(1.8); opacity: 0; }
+}
+.pulse-marker {
+    position: relative;
+}
+.pulse-marker::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(220, 53, 69, 0.5);
+    animation: pulse-ring 1.6s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+.map-timeline {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #dee2e6;
+}
+.timeline-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #5c4033 0%, #8b7355 100%);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-left: 10px;
+}
+.popup-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 13px;
+}
+.popup-label {
+    color: #6c757d;
+    margin-right: 10px;
+}
+#map {
+    height: 650px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.high-risk-summary {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.high-risk-item {
+    padding: 8px 10px;
+    border-left: 3px solid #dc3545;
+    margin-bottom: 6px;
+    background: #fff5f5;
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+}
+.high-risk-item.level-3 {
+    border-left-color: #fd7e14;
+    background: #fff8f0;
+}
+.risk-point-code {
+    font-weight: 600;
+    color: #212529;
+}
+.risk-level-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #fff;
+    margin-left: 4px;
+}
+.badge-type-stone_step { background: #795548; color: #fff; }
+.badge-type-road_stele { background: #607d8b; color: #fff; }
+.badge-type-drainage { background: #009688; color: #fff; }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="row mb-3">
     <div class="col-md-12">
-        <div class="filter-bar">
-            <form method="get" class="row g-3">
+        <div class="map-timeline">
+            <div class="row g-3 align-items-center">
                 <div class="col-md-4">
-                    <label class="form-check-label">
-                        <input type="checkbox" name="high_risk" value="1" {% if high_risk_filter %}checked{% endif %} class="form-check-input">
-                        只显示高风险点位
-                    </label>
+                    <form method="get" class="row g-2 align-items-end" id="timeline-form">
+                        <input type="hidden" name="high_risk" value="{% if high_risk_filter %}1{% else %}0{% endif %}">
+                        <div class="col-md-8">
+                            <label class="form-label small text-muted mb-1">选择历史日期</label>
+                            <input type="date" name="date" id="date-input" value="{{ date }}" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-sm btn-primary w-100">查看该时点状态</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="col-md-8 text-end">
-                    <button type="submit" class="btn btn-primary">筛选</button>
-                    <a href="{% url 'roads:map' %}" class="btn btn-outline-secondary">重置</a>
+                <div class="col-md-5">
+                    <label class="form-label small text-muted mb-1 d-block">快捷跳转</label>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}" class="btn btn-outline-secondary">现在</a>
+                        <a href="{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}&date=2026-05-20" class="btn btn-outline-secondary" id="btn-1m">1个月前</a>
+                        <a href="{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}&date=2026-03-20" class="btn btn-outline-secondary" id="btn-3m">3个月前</a>
+                        <a href="{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}&date=2025-12-20" class="btn btn-outline-secondary" id="btn-6m">6个月前</a>
+                    </div>
+                    {% if date %}
+                    <span class="timeline-badge">
+                        📅 {{ date }}
+                    </span>
+                    {% endif %}
                 </div>
-            </form>
+                <div class="col-md-3 text-end">
+                    <form method="get" class="d-inline">
+                        <input type="hidden" name="date" value="{{ date }}">
+                        <div class="form-check form-check-inline">
+                            <input type="checkbox" name="high_risk" value="1" id="high-risk-check" {% if high_risk_filter %}checked{% endif %} class="form-check-input">
+                            <label class="form-check-label" for="high-risk-check">只显示高风险点位</label>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary ms-2">筛选</button>
+                        <a href="{% url 'roads:map' %}" class="btn btn-sm btn-outline-secondary">重置</a>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -37,7 +147,9 @@
                 <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#28a745;margin-right:8px;"></span>正常/轻微磨损</div>
                 <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ffc107;margin-right:8px;"></span>一般磨损</div>
                 <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#fd7e14;margin-right:8px;"></span>较重磨损</div>
-                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#dc3545;margin-right:8px;"></span>严重磨损</div>
+                <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#dc3545;margin-right:8px;position:relative;">
+                    <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:rgba(220,53,69,0.4);animation:pulse-ring 1.6s infinite;"></span>
+                </span>严重磨损(脉冲)</div>
                 <div class="mb-2"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#6c757d;margin-right:8px;"></span>无巡查记录</div>
                 <hr>
                 <p class="text-muted small mb-0">点击标记可查看点位详细信息</p>
@@ -60,6 +172,17 @@
                 <a href="{% url 'roads:point_list' %}" class="btn btn-sm btn-outline-primary w-100">点位列表</a>
             </div>
         </div>
+
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <i class="bi bi-exclamation-triangle"></i> 实时高风险汇总
+            </div>
+            <div class="card-body p-2">
+                <div class="high-risk-summary" id="high-risk-summary">
+                    <div class="text-muted small text-center py-3">加载中...</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -68,6 +191,20 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const fmt = d => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    const d1m = new Date(today); d1m.setMonth(d1m.getMonth() - 1);
+    const d3m = new Date(today); d3m.setMonth(d3m.getMonth() - 3);
+    const d6m = new Date(today); d6m.setMonth(d6m.getMonth() - 6);
+    document.getElementById('btn-1m').href = "{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}&date=" + fmt(d1m);
+    document.getElementById('btn-3m').href = "{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}&date=" + fmt(d3m);
+    document.getElementById('btn-6m').href = "{% url 'roads:map' %}?high_risk={% if high_risk_filter %}1{% else %}0{% endif %}&date=" + fmt(d6m);
+
     const map = L.map('map').setView([30.0, 110.0], 5);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -76,12 +213,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }).addTo(map);
 
     const highRiskFilter = {% if high_risk_filter %}true{% else %}false{% endif %};
-    const apiUrl = "{% url 'roads:api_points_geo' %}" + (highRiskFilter ? '?high_risk=1' : '');
+    const dateParam = "{{ date|default:'' }}";
+    const params = new URLSearchParams();
+    if (highRiskFilter) params.append('high_risk', '1');
+    if (dateParam) params.append('date', dateParam);
+    const apiUrl = "{% url 'roads:api_points_geo_timeline' %}" + (params.toString() ? '?' + params.toString() : '');
 
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
             const markers = [];
+            const highRiskList = [];
 
             data.features.forEach(feature => {
                 const props = feature.properties;
@@ -94,57 +236,140 @@ document.addEventListener('DOMContentLoaded', function() {
                 else if (props.wear_level === 4) color = '#dc3545';
 
                 const marker = L.circleMarker([lat, lon], {
-                    radius: props.is_high_risk ? 10 : 7,
+                    radius: props.is_high_risk ? 11 : 7,
                     fillColor: color,
                     color: props.is_high_risk ? '#000' : color,
-                    weight: props.is_high_risk ? 2 : 1,
+                    weight: props.is_high_risk ? 2.5 : 1,
                     opacity: 1,
-                    fillOpacity: 0.85
+                    fillOpacity: props.is_high_risk ? 0.95 : 0.85
                 });
 
-                const popupContent = `
-                    <h6>${props.code} - ${props.name}</h6>
-                    <div class="popup-row">
-                        <span class="popup-label">类型</span>
-                        <span>${props.point_type_display}</span>
-                    </div>
-                    <div class="popup-row">
-                        <span class="popup-label">路段</span>
-                        <span>${props.road_section}</span>
-                    </div>
-                    <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
-                        <div class="popup-row">
-                            <span class="popup-label"><strong>未处理最严重</strong></span>
-                            <span style="color:${color};font-weight:600;">${props.wear_level_display}</span>
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">处理状态</span>
-                            <span>${props.handled ? '<span style="color:#28a745;">全部已处理</span>' : '<span style="color:#dc3545;">存在未处理</span>'}</span>
-                        </div>
-                    </div>
-                    ${props.has_latest ? `
-                    <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
-                        <div class="popup-row">
-                            <span class="popup-label">最新巡查结果</span>
-                            <span>${props.latest_wear_display}</span>
-                        </div>
-                    </div>
-                    ` : ''}
-                    <div class="mt-2">
-                        <a href="/points/${props.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
-                    </div>
-                `;
+                if (props.is_high_risk) {
+                    highRiskList.push({
+                        id: props.id,
+                        code: props.code,
+                        name: props.name,
+                        wear_level: props.wear_level,
+                        wear_level_display: props.wear_level_display,
+                        road_section: props.road_section
+                    });
 
-                marker.bindPopup(popupContent);
-                marker.addTo(map);
-                markers.push(marker);
+                    const pulseIcon = L.divIcon({
+                        className: 'pulse-marker',
+                        html: `<div style="position:relative;width:22px;height:22px;">
+                            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${props.wear_level === 4 ? '18' : '14'}px;height:${props.wear_level === 4 ? '18' : '14'}px;border-radius:50%;background:${color};border:${props.wear_level === 4 ? '2px solid #000' : '1.5px solid ' + color};z-index:2;"></div>
+                            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:${color}66;animation:pulse-ring 1.6s cubic-bezier(0.215,0.61,0.355,1) infinite;"></div>
+                        </div>`,
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    });
+
+                    const markerWithPulse = L.marker([lat, lon], { icon: pulseIcon });
+                    markerWithPulse.bindPopup(buildPopup(props));
+                    markerWithPulse.addTo(map);
+                    markers.push(markerWithPulse);
+
+                    const shadowMarker = L.circleMarker([lat, lon], {
+                        radius: props.wear_level === 4 ? 9 : 6,
+                        fillColor: color,
+                        color: '#000',
+                        weight: 0,
+                        opacity: 0,
+                        fillOpacity: 0
+                    });
+                    shadowMarker.bindPopup(buildPopup(props));
+                    shadowMarker.addTo(map);
+                } else {
+                    marker.bindPopup(buildPopup(props));
+                    marker.addTo(map);
+                    markers.push(marker);
+                }
             });
+
+            renderHighRiskSummary(highRiskList);
 
             if (markers.length > 0) {
                 const group = L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
             }
         });
+
+    function buildPopup(props) {
+        const wearColor = props.wear_level === 1 ? '#28a745' :
+                         props.wear_level === 2 ? '#ffc107' :
+                         props.wear_level === 3 ? '#fd7e14' :
+                         props.wear_level === 4 ? '#dc3545' : '#6c757d';
+        return `
+            <h6 style="margin:0 0 8px 0;font-size:14px;border-bottom:1px solid #eee;padding-bottom:6px;">
+                ${props.code} - ${props.name}
+            </h6>
+            <div class="popup-row">
+                <span class="popup-label">类型</span>
+                <span>${props.point_type_display}</span>
+            </div>
+            <div class="popup-row">
+                <span class="popup-label">路段</span>
+                <span>${props.road_section}</span>
+            </div>
+            <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
+                <div class="popup-row">
+                    <span class="popup-label"><strong>未处理最严重</strong></span>
+                    <span style="color:${wearColor};font-weight:600;">${props.wear_level_display}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">处理状态</span>
+                    <span>${props.handled ? '<span style="color:#28a745;">全部已处理</span>' : '<span style="color:#dc3545;">存在未处理</span>'}</span>
+                </div>
+            </div>
+            ${props.has_latest ? `
+            <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
+                <div class="popup-row">
+                    <span class="popup-label">最新巡查结果</span>
+                    <span>${props.latest_wear_display}</span>
+                </div>
+            </div>
+            ` : ''}
+            <div style="border-top:1px solid #eee;margin-top:8px;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
+                <a href="/points/${props.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
+                <a href="{% url 'roads:charts' %}?point=${props.id}" class="btn btn-sm btn-outline-info w-100">查看磨损演变</a>
+                <a href="{% url 'roads:task_create' %}?point=${props.id}" class="btn btn-sm btn-outline-danger w-100">创建工单</a>
+            </div>
+        `;
+    }
+
+    function renderHighRiskSummary(list) {
+        const container = document.getElementById('high-risk-summary');
+        if (list.length === 0) {
+            container.innerHTML = '<div class="text-success small text-center py-3">✓ 当前无高风险点位</div>';
+            return;
+        }
+        list.sort((a, b) => (b.wear_level || 0) - (a.wear_level || 0));
+        const top10 = list.slice(0, 10);
+        const levelColors = { 3: '#fd7e14', 4: '#dc3545' };
+        container.innerHTML = top10.map(item => `
+            <div class="high-risk-item ${item.wear_level === 3 ? 'level-3' : ''}">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="risk-point-code">${item.code}</span>
+                    <span class="risk-level-tag" style="background:${levelColors[item.wear_level] || '#6c757d'};">
+                        ${item.wear_level_display}
+                    </span>
+                </div>
+                <div class="text-muted small mt-1" style="font-size:11px;">
+                    ${item.name} · ${item.road_section}
+                </div>
+                <div class="mt-1">
+                    <a href="/points/${item.id}/" class="text-primary small" style="font-size:11px;">详情</a>
+                    <span class="text-muted mx-1">|</span>
+                    <a href="{% url 'roads:charts' %}?point=${item.id}" class="text-info small" style="font-size:11px;">演变</a>
+                    <span class="text-muted mx-1">|</span>
+                    <a href="{% url 'roads:task_create' %}?point=${item.id}" class="text-danger small" style="font-size:11px;">工单</a>
+                </div>
+            </div>
+        `).join('');
+        if (list.length > 10) {
+            container.innerHTML += `<div class="text-muted small text-center pt-2" style="font-size:11px;">...还有 ${list.length - 10} 个高风险点位</div>`;
+        }
+    }
 });
 </script>
 {% endblock %}

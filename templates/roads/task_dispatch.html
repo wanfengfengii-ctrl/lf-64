@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}派打工单 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:task_list' %}">整改闭环</a></li>
+        <li class="breadcrumb-item active">派打工单</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>派打工单 <small class="text-muted">#{{ task.pk|stringformat:"06d" }} - {{ task.title }}</small></h4>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card mb-4">
+            <div class="card-header">工单信息摘要</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">工单标题</span>
+                            <span class="info-value">{{ task.title }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">点位</span>
+                            <span class="info-value"><code>{{ task.point.code }}</code> {{ task.point.name }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">所属路段</span>
+                            <span class="info-value">{{ task.point.road_section.name }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">当前状态</span>
+                            <span class="info-value"><span class="badge bg-secondary">{{ task.get_status_display }}</span></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">当前优先级</span>
+                            <span class="info-value">
+                                {% if task.priority == 'urgent' %}
+                                <span class="badge badge-priority-紧急">紧急</span>
+                                {% elif task.priority == 'high' %}
+                                <span class="badge badge-priority-高">高</span>
+                                {% elif task.priority == 'medium' %}
+                                <span class="badge badge-priority-中">中</span>
+                                {% elif task.priority == 'low' %}
+                                <span class="badge badge-priority-低">低</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">创建时间</span>
+                            <span class="info-value">{{ task.created_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% if task.description %}
+                <div class="mt-3">
+                    <div class="info-label mb-1">工单描述</div>
+                    <div class="p-3 bg-light rounded" style="white-space: pre-wrap;">{{ task.description }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">派发信息</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.assigned_to.label }} <span class="text-danger">*</span></label>
+                                {{ form.assigned_to }}
+                                {% if form.assigned_to.errors %}
+                                <div class="text-danger small">{{ form.assigned_to.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.deadline.label }} <span class="text-danger">*</span></label>
+                                {{ form.deadline }}
+                                {% if form.deadline.errors %}
+                                <div class="text-danger small">{{ form.deadline.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.priority.label }} <span class="text-danger">*</span></label>
+                        {{ form.priority }}
+                        {% if form.priority.errors %}
+                        <div class="text-danger small">{{ form.priority.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.dispatch_note.label }}</label>
+                        {{ form.dispatch_note }}
+                        {% if form.dispatch_note.errors %}
+                        <div class="text-danger small">{{ form.dispatch_note.errors|join:", " }}</div>
+                        {% endif %}
+                        <div class="text-muted small">请填写派发说明、整改要求等信息</div>
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:task_detail' task.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-info">确认派发</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

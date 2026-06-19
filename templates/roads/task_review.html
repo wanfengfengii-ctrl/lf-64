@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block title %}复核工单 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:task_list' %}">整改闭环</a></li>
+        <li class="breadcrumb-item active">复核工单</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>复核工单 <small class="text-muted">#{{ task.pk|stringformat:"06d" }} - {{ task.title }}</small></h4>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card mb-4">
+            <div class="card-header">工单信息摘要</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">工单标题</span>
+                            <span class="info-value">{{ task.title }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">点位</span>
+                            <span class="info-value"><code>{{ task.point.code }}</code> {{ task.point.name }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">所属路段</span>
+                            <span class="info-value">{{ task.point.road_section.name }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">指派人员</span>
+                            <span class="info-value">{{ task.assigned_to|default:"-" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">整改完成时间</span>
+                            <span class="info-value">{{ task.rectified_at|date:"Y-m-d H:i"|default:"-" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">整改期限</span>
+                            <span class="info-value">
+                                {% if task.deadline %}
+                                <span class="{% if task.is_overdue %}text-danger fw-bold{% endif %}">{{ task.deadline }}</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>整改结果</span>
+                <span class="badge bg-warning text-dark">待复核</span>
+            </div>
+            <div class="card-body">
+                {% if task.rectification_result %}
+                <div class="p-3 bg-light rounded" style="white-space: pre-wrap;">{{ task.rectification_result }}</div>
+                {% else %}
+                <div class="text-muted text-center py-4">暂无整改结果内容</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">复核信息</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.reviewer.label }} <span class="text-danger">*</span></label>
+                                {{ form.reviewer }}
+                                {% if form.reviewer.errors %}
+                                <div class="text-danger small">{{ form.reviewer.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.review_note.label }} <span class="text-danger">*</span></label>
+                        {{ form.review_note }}
+                        {% if form.review_note.errors %}
+                        <div class="text-danger small">{{ form.review_note.errors|join:", " }}</div>
+                        {% endif %}
+                        <div class="text-muted small">请填写复核意见，复核通过请写明确认意见，不通过请写明返工原因</div>
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:task_detail' task.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" name="action" value="reject" class="btn btn-warning">复核不通过（返工）</button>
+                        <button type="submit" name="action" value="pass" class="btn btn-success">复核通过（闭环）</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,5 +1,9 @@
 from django import forms
-from .models import RoadSection, Point, InspectionRecord, WEAR_LEVEL_CHOICES, POINT_TYPE_CHOICES, ROAD_STATUS_CHOICES
+from .models import (
+    RoadSection, Point, InspectionRecord, Photo, Alert, TaskOrder,
+    WEAR_LEVEL_CHOICES, POINT_TYPE_CHOICES, ROAD_STATUS_CHOICES,
+    ALERT_LEVEL_CHOICES, ALERT_TYPE_CHOICES, TASK_STATUS_CHOICES,
+)
 
 
 class RoadSectionForm(forms.ModelForm):
@@ -73,3 +77,115 @@ class InspectionRecordForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['wear_level'].choices = WEAR_LEVEL_CHOICES
+
+
+class PhotoForm(forms.ModelForm):
+    class Meta:
+        model = Photo
+        fields = ['point', 'inspection', 'image', 'caption', 'photo_type', 'taken_at']
+        widgets = {
+            'point': forms.Select(attrs={'class': 'form-control'}),
+            'inspection': forms.Select(attrs={'class': 'form-control'}),
+            'image': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'caption': forms.TextInput(attrs={'class': 'form-control'}),
+            'photo_type': forms.Select(attrs={'class': 'form-control'}),
+            'taken_at': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+
+
+class TaskOrderForm(forms.ModelForm):
+    class Meta:
+        model = TaskOrder
+        fields = ['inspection', 'point', 'title', 'description', 'priority', 'assigned_to', 'deadline']
+        widgets = {
+            'inspection': forms.Select(attrs={'class': 'form-control'}),
+            'point': forms.Select(attrs={'class': 'form-control'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'priority': forms.Select(attrs={'class': 'form-control'}),
+            'assigned_to': forms.TextInput(attrs={'class': 'form-control'}),
+            'deadline': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+
+
+class TaskDispatchForm(forms.ModelForm):
+    class Meta:
+        model = TaskOrder
+        fields = ['assigned_to', 'dispatch_note', 'deadline', 'priority']
+        widgets = {
+            'assigned_to': forms.TextInput(attrs={'class': 'form-control'}),
+            'dispatch_note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'deadline': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'priority': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+
+class TaskRectifyForm(forms.ModelForm):
+    class Meta:
+        model = TaskOrder
+        fields = ['rectification_result']
+        widgets = {
+            'rectification_result': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+
+class TaskReviewForm(forms.ModelForm):
+    class Meta:
+        model = TaskOrder
+        fields = ['review_note', 'reviewer']
+        widgets = {
+            'review_note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'reviewer': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class AlertForm(forms.ModelForm):
+    class Meta:
+        model = Alert
+        fields = ['point', 'alert_type', 'alert_level', 'message']
+        widgets = {
+            'point': forms.Select(attrs={'class': 'form-control'}),
+            'alert_type': forms.Select(attrs={'class': 'form-control'}),
+            'alert_level': forms.Select(attrs={'class': 'form-control'}),
+            'message': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class DataExportForm(forms.Form):
+    EXPORT_TYPE_CHOICES = [
+        ('inspections', '巡查记录'),
+        ('points', '点位数据'),
+        ('tasks', '工单数据'),
+        ('alerts', '预警数据'),
+    ]
+    FORMAT_CHOICES = [
+        ('csv', 'CSV'),
+        ('xlsx', 'Excel (xlsx)'),
+    ]
+    export_type = forms.ChoiceField(
+        label='导出类型',
+        choices=EXPORT_TYPE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    export_format = forms.ChoiceField(
+        label='文件格式',
+        choices=FORMAT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    road_section = forms.ModelChoiceField(
+        label='路段筛选',
+        queryset=RoadSection.objects.all(),
+        required=False,
+        empty_label='全部路段',
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    date_from = forms.DateField(
+        label='开始日期',
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    date_to = forms.DateField(
+        label='结束日期',
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )

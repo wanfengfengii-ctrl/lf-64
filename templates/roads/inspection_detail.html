@@ -15,6 +15,9 @@
     <h4>巡查记录详情</h4>
     <div>
         <a href="{% url 'roads:inspection_edit' inspection.pk %}" class="btn btn-outline-secondary">编辑</a>
+        {% if not inspection.handled %}
+        <a href="{% url 'roads:task_create_from_insp' inspection.pk %}" class="btn btn-warning">+ 创建整改工单</a>
+        {% endif %}
         <a href="{% url 'roads:point_detail' inspection.point.pk %}" class="btn btn-primary">查看点位</a>
     </div>
 </div>
@@ -97,6 +100,38 @@
                 <a href="{% url 'roads:inspection_delete' inspection.pk %}" class="btn btn-outline-danger btn-sm w-100 mt-3">删除此记录</a>
             </div>
         </div>
+
+        {% if inspection.task_orders.all %}
+        <div class="card mt-3">
+            <div class="card-header">关联整改工单 ({{ inspection.task_orders.all|length }})</div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>工单标题</th>
+                            <th>状态</th>
+                            <th>优先级</th>
+                            <th>指派人员</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in inspection.task_orders.all %}
+                        <tr class="{% if task.is_overdue %}table-danger{% endif %}">
+                            <td>{{ task.title }}</td>
+                            <td><span class="badge badge-task-{{ task.status }}">{{ task.get_status_display }}</span></td>
+                            <td><span class="badge badge-priority-{{ task.get_priority_display }}">{{ task.get_priority_display }}</span></td>
+                            <td>{{ task.assigned_to|default:"未指派" }}</td>
+                            <td>{{ task.created_at|date:"Y-m-d H:i" }}</td>
+                            <td><a href="{% url 'roads:task_detail' task.pk %}" class="btn btn-sm btn-outline-primary">查看详情</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

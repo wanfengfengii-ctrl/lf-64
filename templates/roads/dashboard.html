@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}首页 - 古驿道磨损记录系统{% endblock %}
+{% block title %}首页总览 - 古驿道巡查养护闭环管理系统{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -30,6 +30,45 @@
     </div>
 </div>
 
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="mini-stat bg-danger text-white">
+            <div class="mini-stat-value">{{ critical_alerts }}</div>
+            <div class="mini-stat-label">紧急预警</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-warning text-white">
+            <div class="mini-stat-value">{{ unread_alerts }}</div>
+            <div class="mini-stat-label">未读预警</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-info text-white">
+            <div class="mini-stat-value">{{ pending_tasks }}</div>
+            <div class="mini-stat-label">待派工单</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-primary text-white">
+            <div class="mini-stat-value">{{ rectifying_tasks }}</div>
+            <div class="mini-stat-label">整改中</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-secondary text-white">
+            <div class="mini-stat-value">{{ overdue_tasks }}</div>
+            <div class="mini-stat-label">超期工单</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-success text-white">
+            <div class="mini-stat-value">{{ critical_points|length }}</div>
+            <div class="mini-stat-label">严重磨损点</div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-8">
         <div class="card">
@@ -47,6 +86,7 @@
                             <th>巡查员</th>
                             <th>磨损等级</th>
                             <th>优先级</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -58,9 +98,12 @@
                             <td>{{ insp.inspector }}</td>
                             <td><span class="badge badge-wear-{{ insp.wear_level }}">{{ insp.get_wear_level_display }}</span></td>
                             <td><span class="badge badge-priority-{{ insp.get_priority }}">{{ insp.get_priority }}</span></td>
+                            <td>
+                                <a href="{% url 'roads:inspection_detail' insp.pk %}" class="btn btn-sm btn-outline-primary">详情</a>
+                            </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="6" class="text-center text-muted">暂无巡查记录</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted">暂无巡查记录</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -70,7 +113,9 @@
 
     <div class="col-md-4">
         <div class="card">
-            <div class="card-header">磨损等级分布</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>磨损等级分布</span>
+            </div>
             <div class="card-body">
                 {% for stat in wear_stats_list %}
                 <div class="mb-3">
@@ -88,6 +133,115 @@
         </div>
 
         <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>工单状态分布</span>
+            </div>
+            <div class="card-body">
+                {% for key, label in task_status_choices.items %}
+                <div class="mb-2">
+                    {% with count=task_stats_dict|default:0 %}
+                    {% for k, v in task_stats_dict.items %}
+                    {% if k == key %}
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="badge badge-task-{{ key }}">{{ label }}</span>
+                        <span class="small">{{ v }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endwith %}
+                </div>
+                {% endfor %}
+                <div class="mt-3 pt-3 border-top">
+                    <a href="{% url 'roads:task_list' %}" class="btn btn-sm btn-outline-primary w-100">查看全部工单</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>最新风险预警</span>
+                <a href="{% url 'roads:alert_list' %}" class="btn btn-sm btn-outline-primary">全部预警</a>
+            </div>
+            <div class="card-body" style="max-height: 380px; overflow-y: auto;">
+                {% if recent_alerts %}
+                <div class="list-group list-group-flush">
+                    {% for alert in recent_alerts %}
+                    <a href="{% url 'roads:alert_detail' alert.pk %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div>
+                                <span class="badge badge-alert-{{ alert.alert_level }} me-1">{{ alert.get_alert_level_display }}</span>
+                                <span class="fw-semibold">{{ alert.get_alert_type_display }}</span>
+                            </div>
+                            <small class="text-muted">{{ alert.created_at|date:"m-d H:i" }}</small>
+                        </div>
+                        <div class="small text-muted">
+                            <span class="fw-medium">{{ alert.point.code }}</span> - {{ alert.message|truncatechars:60 }}
+                        </div>
+                        <div class="mt-1">
+                            {% if not alert.is_read %}<span class="badge bg-danger">未读</span>{% endif %}
+                            {% if not alert.is_resolved %}<span class="badge bg-warning text-dark">未处理</span>{% else %}<span class="badge bg-success">已处理</span>{% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-4 mb-0">暂无预警记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>最新整改工单</span>
+                <a href="{% url 'roads:task_list' %}" class="btn btn-sm btn-outline-primary">全部工单</a>
+            </div>
+            <div class="card-body" style="max-height: 380px; overflow-y: auto;">
+                {% if recent_tasks %}
+                <div class="list-group list-group-flush">
+                    {% for task in recent_tasks %}
+                    <a href="{% url 'roads:task_detail' task.pk %}" class="list-group-item list-group-item-action {% if task.is_overdue %}list-group-item-danger{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div>
+                                <span class="badge badge-task-{{ task.status }} me-1">{{ task.get_status_display }}</span>
+                                <span class="badge badge-priority-{{ task.get_priority_display }} me-1">{{ task.get_priority_display }}</span>
+                                <span class="fw-semibold">{{ task.title|truncatechars:20 }}</span>
+                            </div>
+                            <small class="text-muted">{{ task.created_at|date:"m-d" }}</small>
+                        </div>
+                        <div class="small text-muted">
+                            <span class="fw-medium">{{ task.point.code }}</span>
+                            {% if task.assigned_to %}
+                            · 指派: {{ task.assigned_to }}
+                            {% else %}
+                            · <span class="text-warning">未指派</span>
+                            {% endif %}
+                            {% if task.deadline %}
+                            · 截止: {{ task.deadline|date:"m-d" }}
+                            {% endif %}
+                        </div>
+                        {% if task.is_overdue %}
+                        <div class="mt-1"><span class="badge bg-danger">已超期</span></div>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-4 mb-0">暂无工单记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
             <div class="card-header">严重磨损点位</div>
             <div class="card-body" style="max-height: 300px; overflow-y: auto;">
                 {% if critical_points %}
@@ -98,7 +252,10 @@
                             <div class="fw-semibold">{{ p.code }} - {{ p.name }}</div>
                             <small class="text-muted">{{ p.road_section.name }}</small>
                         </div>
-                        <span class="badge badge-wear-4">严重</span>
+                        <div>
+                            <span class="badge badge-wear-4">严重</span>
+                            <a href="{% url 'roads:task_create_from_insp' p.get_worst_unhandled_inspection.pk %}" class="btn btn-sm btn-warning ms-2">派单</a>
+                        </div>
                     </a>
                     {% endfor %}
                 </div>
@@ -108,10 +265,8 @@
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-12">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">存在问题的路段</div>
             <div class="card-body">
@@ -141,6 +296,21 @@
                 {% else %}
                 <p class="text-center text-muted mb-0">所有路段状态正常</p>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <a href="{% url 'roads:alert_generate_auto' %}" class="btn btn-danger me-2"
+                   onclick="return confirm('确定要自动扫描并生成预警吗？')">🔍 自动生成风险预警</a>
+                <a href="{% url 'roads:priority_list' %}" class="btn btn-warning me-2">📋 维护优先级清单</a>
+                <a href="{% url 'roads:export' %}" class="btn btn-primary me-2">📤 数据导出</a>
+                <a href="{% url 'roads:map' %}" class="btn btn-info me-2">🗺️ 地图模式</a>
+                <a href="{% url 'roads:charts' %}" class="btn btn-success">📊 趋势分析</a>
             </div>
         </div>
     </div>

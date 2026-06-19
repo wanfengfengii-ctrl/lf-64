@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}数据导出中心 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">数据导出中心</li>
+    </ol>
+</nav>
+
+<h4 class="mb-3">📊 数据导出中心</h4>
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">导出配置</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.export_type.label }} <span class="text-danger">*</span></label>
+                                {{ form.export_type }}
+                                {% if form.export_type.errors %}
+                                <div class="text-danger small">{{ form.export_type.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.export_format.label }} <span class="text-danger">*</span></label>
+                                {{ form.export_format }}
+                                {% if form.export_format.errors %}
+                                <div class="text-danger small">{{ form.export_format.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.road_section.label }}</label>
+                        {{ form.road_section }}
+                        {% if form.road_section.errors %}
+                        <div class="text-danger small">{{ form.road_section.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="text-muted">不选择则导出全部路段数据</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.date_from.label }}</label>
+                                {{ form.date_from }}
+                                {% if form.date_from.errors %}
+                                <div class="text-danger small">{{ form.date_from.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.date_to.label }}</label>
+                                {{ form.date_to }}
+                                {% if form.date_to.errors %}
+                                <div class="text-danger small">{{ form.date_to.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-end mt-3">
+                        <button type="submit" class="btn btn-primary btn-lg px-5">⬇️ 生成并下载</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">导出说明</div>
+            <div class="card-body">
+                <h6 class="text-primary mb-3">各导出类型包含字段</h6>
+                <div class="mb-3">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item px-0">
+                            <strong>📋 巡查记录</strong><br>
+                            <small class="text-muted">包含：点位编号/名称、路段、巡查日期、巡查员、磨损等级、磨损描述、维护建议、处理状态等
+                        </li>
+                        <li class="list-group-item px-0">
+                            <strong>📍 点位数据</strong><br>
+                            <small class="text-muted">包含：点位编号、名称、所属路段、类型、坐标、描述、最新磨损等级、风险状态等
+                        </li>
+                        <li class="list-group-item px-0">
+                            <strong>🔧 工单数据</strong><br>
+                            <small class="text-muted">包含：工单标题、关联点位、巡查信息、优先级、状态、指派人员、整改期限、各环节时间节点等
+                        </li>
+                        <li class="list-group-item px-0">
+                            <strong>⚠️ 预警数据</strong><br>
+                            <small class="text-muted">包含：预警类型、等级、关联点位、预警信息、是否已读、处理状态、创建时间等
+                        </li>
+                    </ul>
+                </div>
+                <hr>
+                <h6 class="text-primary mb-3">格式说明</h6>
+                <ul class="mb-3">
+                    <li><strong>CSV：</strong>通用逗号分隔格式，兼容Excel、WPS等办公软件，可直接打开编辑</li>
+                    <li><strong>Excel (xlsx)：</strong>微软Excel标准格式，支持多工作表和样式</li>
+                </ul>
+                <hr>
+                <h6 class="text-primary mb-3">使用提示</h6>
+                <ul class="mb-0">
+                    <li>建议使用<strong>路段筛选</strong>可按路段缩小导出范围</li>
+                    <li><strong>日期范围</strong>按各模块对应不同含义：巡查按巡查日期、工单按创建日期、预警按生成日期</li>
+                    <li>数据量较大时建议分批选择<strong>CSV</strong>格式以提高导出速度</li>
+                    <li>导出后请核对数据完整性，如有问题请联系管理员</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

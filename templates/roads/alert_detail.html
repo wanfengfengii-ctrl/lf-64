@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block title %}预警详情 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:alert_list' %}">风险预警</a></li>
+        <li class="breadcrumb-item active">详情</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-10 offset-md-1">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    {% if alert.alert_level == 'critical' %}
+                    <span class="badge bg-danger fs-6 me-2">紧急</span>
+                    {% elif alert.alert_level == 'warning' %}
+                    <span class="badge bg-warning text-dark fs-6 me-2">警告</span>
+                    {% else %}
+                    <span class="badge bg-info fs-6 me-2">提示</span>
+                    {% endif %}
+                    <strong class="fs-5">
+                        {% if alert.alert_type == 'wear_critical' %}严重磨损预警
+                        {% elif alert.alert_type == 'wear_worsening' %}磨损恶化趋势
+                        {% elif alert.alert_type == 'task_overdue' %}工单超期预警
+                        {% elif alert.alert_type == 'unhandled_long' %}长期未处理预警
+                        {% endif %}
+                    </strong>
+                </div>
+                <div>
+                    {% if alert.is_resolved %}
+                    <span class="badge bg-success me-1">已处理</span>
+                    {% elif alert.is_read %}
+                    <span class="badge bg-warning text-dark me-1">已读未处理</span>
+                    {% else %}
+                    <span class="badge bg-danger me-1">未读</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="info-section">
+                    <h6>基本信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">创建时间</span>
+                        <span class="info-value">{{ alert.created_at|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                    {% if alert.resolved_at %}
+                    <div class="info-row">
+                        <span class="info-label">处理时间</span>
+                        <span class="info-value">{{ alert.resolved_at|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-row">
+                        <span class="info-label">预警等级</span>
+                        <span class="info-value">
+                            {% if alert.alert_level == 'critical' %}
+                            <span class="badge bg-danger">紧急</span>
+                            {% elif alert.alert_level == 'warning' %}
+                            <span class="badge bg-warning text-dark">警告</span>
+                            {% else %}
+                            <span class="badge bg-info">提示</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">预警类型</span>
+                        <span class="info-value">
+                            {% if alert.alert_type == 'wear_critical' %}严重磨损预警
+                            {% elif alert.alert_type == 'wear_worsening' %}磨损恶化趋势
+                            {% elif alert.alert_type == 'task_overdue' %}工单超期预警
+                            {% elif alert.alert_type == 'unhandled_long' %}长期未处理预警
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h6>关联信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">关联点位</span>
+                        <span class="info-value">
+                            <a href="{% url 'roads:point_detail' alert.point.pk %}">
+                                <code>{{ alert.point.code }}</code> {{ alert.point.name }}
+                            </a>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">所属路段</span>
+                        <span class="info-value">
+                            <a href="{% url 'roads:road_detail' alert.point.road_section.pk %}">
+                                {{ alert.point.road_section.name }}
+                            </a>
+                        </span>
+                    </div>
+                    {% if alert.related_inspection %}
+                    <div class="info-row">
+                        <span class="info-label">关联巡查记录</span>
+                        <span class="info-value">
+                            <a href="{% url 'roads:inspection_detail' alert.related_inspection.pk %}">
+                                {{ alert.related_inspection.inspection_date }} - {{ alert.related_inspection.inspector }}
+                            </a>
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="info-section">
+                    <h6>预警信息</h6>
+                    <div class="alert alert-secondary" style="white-space: pre-wrap;">{{ alert.message }}</div>
+                </div>
+
+                {% if alert.related_inspection %}
+                <div class="info-section">
+                    <h6>关联巡查记录详情</h6>
+                    <div class="info-row">
+                        <span class="info-label">磨损等级</span>
+                        <span class="info-value">
+                            <span class="badge badge-wear-{{ alert.related_inspection.wear_level }}">
+                                {{ alert.related_inspection.get_wear_level_display }}
+                            </span>
+                        </span>
+                    </div>
+                    {% if alert.related_inspection.wear_description %}
+                    <div class="info-row">
+                        <span class="info-label">磨损描述</span>
+                        <span class="info-value" style="white-space: pre-wrap;">{{ alert.related_inspection.wear_description }}</span>
+                    </div>
+                    {% endif %}
+                    {% if alert.related_inspection.maintenance_suggestion %}
+                    <div class="info-row">
+                        <span class="info-label">维护建议</span>
+                        <span class="info-value" style="white-space: pre-wrap;">{{ alert.related_inspection.maintenance_suggestion }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'roads:alert_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                    {% if not alert.is_read %}
+                    <form method="post" action="{% url 'roads:alert_mark_read' alert.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning">标记已读</button>
+                    </form>
+                    {% endif %}
+                    {% if not alert.is_resolved %}
+                    <form method="post" action="{% url 'roads:alert_resolve' alert.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success">标记已处理</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

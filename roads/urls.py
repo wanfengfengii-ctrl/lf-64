@@ -7,6 +7,8 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('map/', views.map_view, name='map'),
     path('charts/', views.charts_view, name='charts'),
+    path('priority/', views.priority_list, name='priority_list'),
+    path('export/', views.export_page, name='export'),
 
     path('roads/', views.road_list, name='road_list'),
     path('roads/create/', views.road_create, name='road_create'),
@@ -26,6 +28,29 @@ urlpatterns = [
     path('inspections/<int:pk>/edit/', views.inspection_edit, name='inspection_edit'),
     path('inspections/<int:pk>/delete/', views.inspection_delete, name='inspection_delete'),
 
+    path('alerts/', views.alert_list, name='alert_list'),
+    path('alerts/create/', views.alert_create, name='alert_create'),
+    path('alerts/generate/', views.alert_generate_auto, name='alert_generate_auto'),
+    path('alerts/<int:pk>/', views.alert_detail, name='alert_detail'),
+    path('alerts/<int:pk>/read/', views.alert_mark_read, name='alert_mark_read'),
+    path('alerts/<int:pk>/resolve/', views.alert_resolve, name='alert_resolve'),
+
+    path('tasks/', views.task_list, name='task_list'),
+    path('tasks/create/', views.task_create, name='task_create'),
+    path('tasks/create/<int:inspection_pk>/', views.task_create, name='task_create_from_insp'),
+    path('tasks/<int:pk>/', views.task_detail, name='task_detail'),
+    path('tasks/<int:pk>/dispatch/', views.task_dispatch, name='task_dispatch'),
+    path('tasks/<int:pk>/rectify/', views.task_rectify, name='task_rectify'),
+    path('tasks/<int:pk>/review/', views.task_review, name='task_review'),
+    path('tasks/<int:pk>/status/', views.task_status_progress, name='task_status_progress'),
+
+    path('photos/', views.photo_list, name='photo_list'),
+    path('photos/upload/', views.photo_upload, name='photo_upload'),
+    path('photos/<int:pk>/', views.photo_detail, name='photo_detail'),
+    path('photos/<int:pk>/delete/', views.photo_delete, name='photo_delete'),
+
     path('api/wear-data/', views.api_wear_data, name='api_wear_data'),
     path('api/points-geo/', views.api_points_geo, name='api_points_geo'),
+    path('api/points-geo-timeline/', views.api_points_geo_timeline, name='api_points_geo_timeline'),
+    path('api/point/<int:point_pk>/wear-history/', views.api_point_wear_history, name='api_point_wear_history'),
 ]

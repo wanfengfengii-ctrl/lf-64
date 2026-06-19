@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}上传照片 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:photo_list' %}">照片档案</a></li>
+        <li class="breadcrumb-item active">上传照片</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>上传照片</h4>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">照片信息</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.point.label }} <span class="text-danger">*</span></label>
+                                {{ form.point }}
+                                {% if form.point.errors %}
+                                <div class="text-danger small">{{ form.point.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.inspection.label }}</label>
+                                {{ form.inspection }}
+                                {% if form.inspection.errors %}
+                                <div class="text-danger small">{{ form.inspection.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.image.label }} <span class="text-danger">*</span></label>
+                        {{ form.image }}
+                        {% if form.image.errors %}
+                        <div class="text-danger small">{{ form.image.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.caption.label }}</label>
+                                {{ form.caption }}
+                                {% if form.caption.errors %}
+                                <div class="text-danger small">{{ form.caption.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.photo_type.label }}</label>
+                                {{ form.photo_type }}
+                                {% if form.photo_type.errors %}
+                                <div class="text-danger small">{{ form.photo_type.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.taken_at.label }}</label>
+                                {{ form.taken_at }}
+                                {% if form.taken_at.errors %}
+                                <div class="text-danger small">{{ form.taken_at.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:photo_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                        <button type="submit" class="btn btn-primary">上传</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

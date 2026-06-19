@@ -14,6 +14,8 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4>{{ point.code }} - {{ point.name }}</h4>
     <div>
+        <a href="{% url 'roads:photo_upload' %}?point={{ point.pk }}" class="btn btn-outline-info">+ 上传照片</a>
+        <a href="{% url 'roads:task_create' %}" class="btn btn-warning">+ 派发工单</a>
         <a href="{% url 'roads:point_edit' point.pk %}" class="btn btn-outline-secondary">编辑点位</a>
         <a href="{% url 'roads:inspection_create' %}" class="btn btn-primary">+ 新增巡查</a>
     </div>
@@ -113,44 +115,165 @@
 
     <div class="col-md-7">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>巡查记录 ({{ inspections|length }})</span>
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#tab-inspections">巡查记录 ({{ inspections|length }})</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-tasks">整改工单 ({{ task_orders|length }})</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-photos">照片档案 ({{ photos|length }})</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-alerts">风险预警 ({{ alerts|length }})</a>
+                    </li>
+                </ul>
             </div>
             <div class="card-body">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>日期</th>
-                            <th>巡查员</th>
-                            <th>磨损等级</th>
-                            <th>处理状态</th>
-                            <th>优先级</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for insp in inspections %}
-                        <tr>
-                            <td>{{ insp.inspection_date }}</td>
-                            <td>{{ insp.inspector }}</td>
-                            <td><span class="badge badge-wear-{{ insp.wear_level }}">{{ insp.get_wear_level_display }}</span></td>
-                            <td>
-                                {% if insp.handled %}
-                                <span class="text-success">✓ 已处理</span>
-                                {% else %}
-                                <span class="text-danger">✗ 未处理</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="badge badge-priority-{{ insp.get_priority }}">{{ insp.get_priority }}</span></td>
-                            <td>
-                                <a href="{% url 'roads:inspection_detail' insp.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="6" class="text-center text-muted">暂无巡查记录</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab-inspections">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>日期</th>
+                                        <th>巡查员</th>
+                                        <th>磨损等级</th>
+                                        <th>处理状态</th>
+                                        <th>优先级</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for insp in inspections %}
+                                    <tr>
+                                        <td>{{ insp.inspection_date }}</td>
+                                        <td>{{ insp.inspector }}</td>
+                                        <td><span class="badge badge-wear-{{ insp.wear_level }}">{{ insp.get_wear_level_display }}</span></td>
+                                        <td>
+                                            {% if insp.handled %}
+                                            <span class="text-success">✓ 已处理</span>
+                                            {% else %}
+                                            <span class="text-danger">✗ 未处理</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="badge badge-priority-{{ insp.get_priority }}">{{ insp.get_priority }}</span></td>
+                                        <td>
+                                            <a href="{% url 'roads:inspection_detail' insp.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                                            {% if not insp.handled %}
+                                            <a href="{% url 'roads:task_create_from_insp' insp.pk %}" class="btn btn-sm btn-outline-warning">工单</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="6" class="text-center text-muted">暂无巡查记录</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-tasks">
+                        {% if task_orders %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>工单标题</th>
+                                        <th>状态</th>
+                                        <th>优先级</th>
+                                        <th>指派</th>
+                                        <th>期限</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in task_orders %}
+                                    <tr class="{% if task.is_overdue %}table-danger{% endif %}">
+                                        <td>{{ task.title }}</td>
+                                        <td><span class="badge badge-task-{{ task.status }}">{{ task.get_status_display }}</span></td>
+                                        <td><span class="badge badge-priority-{{ task.get_priority_display }}">{{ task.get_priority_display }}</span></td>
+                                        <td>{{ task.assigned_to|default:"-" }}</td>
+                                        <td>{{ task.deadline|default:"-" }}</td>
+                                        <td><a href="{% url 'roads:task_detail' task.pk %}" class="btn btn-sm btn-outline-primary">详情</a></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-center text-muted py-4">暂无工单记录</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-photos">
+                        {% if photos %}
+                        <div class="photo-grid">
+                            {% for p in photos %}
+                            <a href="{% url 'roads:photo_detail' p.pk %}" class="photo-card">
+                                <img src="{{ p.image.url }}" class="photo-thumbnail" alt="{{ p.caption }}">
+                                <div class="photo-info">
+                                    <span class="badge badge-type-{{ p.photo_type }}">{{ p.get_photo_type_display }}</span>
+                                    <small class="text-muted">{{ p.uploaded_at|date:"Y-m-d" }}</small>
+                                </div>
+                                {% if p.caption %}<div class="photo-caption">{{ p.caption|truncatechars:20 }}</div>{% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-3 text-center">
+                            <a href="{% url 'roads:photo_list' %}?point={{ point.pk }}" class="btn btn-outline-primary btn-sm">查看全部照片</a>
+                        </div>
+                        {% else %}
+                        <p class="text-center text-muted py-4">暂无照片</p>
+                        <div class="text-center">
+                            <a href="{% url 'roads:photo_upload' %}?point={{ point.pk }}" class="btn btn-primary btn-sm">上传照片</a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-alerts">
+                        {% if alerts %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>等级</th>
+                                        <th>类型</th>
+                                        <th>信息</th>
+                                        <th>状态</th>
+                                        <th>时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for a in alerts %}
+                                    <tr>
+                                        <td><span class="badge badge-alert-{{ a.alert_level }}">{{ a.get_alert_level_display }}</span></td>
+                                        <td>{{ a.get_alert_type_display }}</td>
+                                        <td style="max-width:250px;">{{ a.message|truncatechars:60 }}</td>
+                                        <td>
+                                            {% if a.is_resolved %}
+                                            <span class="text-success">已处理</span>
+                                            {% elif a.is_read %}
+                                            <span class="text-warning">未处理</span>
+                                            {% else %}
+                                            <span class="text-danger">未读</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ a.created_at|date:"Y-m-d" }}</td>
+                                        <td><a href="{% url 'roads:alert_detail' a.pk %}" class="btn btn-sm btn-outline-primary">查看</a></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-center text-muted py-4">暂无预警记录</p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

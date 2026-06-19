@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}照片详情 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:photo_list' %}">照片档案</a></li>
+        <li class="breadcrumb-item active">详情</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>照片详情</h4>
+    <div>
+        <form method="post" action="{% url 'roads:photo_delete' photo.pk %}" class="d-inline" onsubmit="return confirm('确定要删除这张照片吗？');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger">删除</button>
+        </form>
+        <a href="{% url 'roads:photo_list' %}" class="btn btn-primary">返回列表</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center">
+                <img src="{{ photo.image.url }}" class="img-fluid rounded" alt="{{ photo.caption }}" style="max-width: 80%;">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">详细信息</div>
+            <div class="card-body">
+                <div class="info-row">
+                    <span class="info-label">点位</span>
+                    <span class="info-value"><a href="{% url 'roads:point_detail' photo.point.pk %}">{{ photo.point.code }} {{ photo.point.name }}</a></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">路段</span>
+                    <span class="info-value">{{ photo.point.road_section.name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">关联巡查</span>
+                    <span class="info-value">
+                        {% if photo.inspection %}
+                        <a href="{% url 'roads:inspection_detail' photo.inspection.pk %}">{{ photo.inspection.inspection_date }}</a>
+                        {% else %}
+                        <span class="text-muted">无</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">照片类型</span>
+                    <span class="info-value">
+                        {% if photo.photo_type == 'inspection' %}
+                        <span class="badge bg-primary">巡查照片</span>
+                        {% elif photo.photo_type == 'damage' %}
+                        <span class="badge bg-danger">破损照片</span>
+                        {% elif photo.photo_type == 'rectification' %}
+                        <span class="badge bg-warning text-dark">整改照片</span>
+                        {% elif photo.photo_type == 'verification' %}
+                        <span class="badge bg-success">复核照片</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">拍摄日期</span>
+                    <span class="info-value">{{ photo.taken_at|default:"-" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">上传时间</span>
+                    <span class="info-value">{{ photo.uploaded_at|date:"Y-m-d H:i" }}</span>
+                </div>
+                {% if photo.caption %}
+                <div class="mt-3">
+                    <h6 class="text-muted mb-2">照片说明</h6>
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ photo.caption }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if related_photos %}
+<div class="card">
+    <div class="card-header">同点位其他照片</div>
+    <div class="card-body">
+        <div class="row">
+            {% for rp in related_photos %}
+            <div class="col-md-2 mb-3">
+                <a href="{% url 'roads:photo_detail' rp.pk %}" class="text-decoration-none">
+                    <div class="card h-100">
+                        <img src="{{ rp.image.url }}" class="card-img-top img-fluid" alt="{{ rp.caption }}" style="height: 100px; object-fit: cover;">
+                        <div class="card-body p-2 text-center">
+                            <small class="text-muted">{{ rp.uploaded_at|date:"m-d" }}</small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

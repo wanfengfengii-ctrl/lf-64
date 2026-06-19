@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}提交整改 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:task_list' %}">整改闭环</a></li>
+        <li class="breadcrumb-item active">提交整改</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>提交整改 <small class="text-muted">#{{ task.pk|stringformat:"06d" }} - {{ task.title }}</small></h4>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card mb-4">
+            <div class="card-header">工单信息摘要</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">工单标题</span>
+                            <span class="info-value">{{ task.title }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">点位</span>
+                            <span class="info-value"><code>{{ task.point.code }}</code> {{ task.point.name }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">所属路段</span>
+                            <span class="info-value">{{ task.point.road_section.name }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">指派人员</span>
+                            <span class="info-value">{{ task.assigned_to|default:"-" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">优先级</span>
+                            <span class="info-value">
+                                {% if task.priority == 'urgent' %}
+                                <span class="badge badge-priority-紧急">紧急</span>
+                                {% elif task.priority == 'high' %}
+                                <span class="badge badge-priority-高">高</span>
+                                {% elif task.priority == 'medium' %}
+                                <span class="badge badge-priority-中">中</span>
+                                {% elif task.priority == 'low' %}
+                                <span class="badge badge-priority-低">低</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">整改期限</span>
+                            <span class="info-value">
+                                {% if task.deadline %}
+                                <span class="{% if task.is_overdue %}text-danger fw-bold{% endif %}">{{ task.deadline }}</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% if task.dispatch_note %}
+                <div class="mt-3">
+                    <div class="info-label mb-1">派发说明</div>
+                    <div class="p-3 bg-light rounded" style="white-space: pre-wrap;">{{ task.dispatch_note }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="alert alert-warning mb-4" role="alert">
+            <strong>提示：</strong>提交整改结果后，工单状态将变为「待复核」，请确保整改工作已完成并填写详细情况。
+        </div>
+
+        <div class="card">
+            <div class="card-header">整改信息</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.rectification_result.label }} <span class="text-danger">*</span></label>
+                        {{ form.rectification_result }}
+                        {% if form.rectification_result.errors %}
+                        <div class="text-danger small">{{ form.rectification_result.errors|join:", " }}</div>
+                        {% endif %}
+                        <div class="text-muted small">请详细填写整改情况，包括整改措施、完成情况、整改人等信息</div>
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:task_detail' task.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-warning">提交整改</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

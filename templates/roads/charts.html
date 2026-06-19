@@ -24,7 +24,18 @@
                         <option value="12" {% if months_count == 12 %}selected{% endif %}>最近 12 个月</option>
                     </select>
                 </div>
-                <div class="col-md-5 text-end">
+                <div class="col-md-3">
+                    <label class="form-label">选择点位<span class="text-muted small ms-1">(选则追踪单点位)</span></label>
+                    <select name="point" class="form-select" id="point-select">
+                        <option value="">— 按路段统计 —</option>
+                        {% for p in points %}
+                        <option value="{{ p.pk }}" {% if selected_point_id == p.pk %}selected{% endif %} data-road="{{ p.road_section.pk }}">
+                            {{ p.code }} - {{ p.name }} ({{ p.road_section.name }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 text-end">
                     <button type="submit" class="btn btn-primary">生成图表</button>
                     <a href="{% url 'roads:charts' %}" class="btn btn-outline-secondary">重置</a>
                 </div>
@@ -36,9 +47,18 @@
 <div class="row">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header">月度平均磨损等级趋势</div>
+            <div class="card-header">
+                {% if selected_point_id %}
+                点位磨损演变追踪
+                {% for p in points %}{% if p.pk == selected_point_id %}
+                <span class="badge bg-info ms-2">{{ p.code }} - {{ p.name }}</span>
+                {% endif %}{% endfor %}
+                {% else %}
+                月度平均磨损等级趋势
+                {% endif %}
+            </div>
             <div class="card-body">
-                <div class="chart-container">
+                <div class="chart-container" style="position:relative;height:380px;">
                     <canvas id="wearTrendChart"></canvas>
                 </div>
             </div>
@@ -46,12 +66,27 @@
     </div>
 </div>
 
-<div class="row">
+{% if selected_point_id %}
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">点位巡查历史记录</div>
+            <div class="card-body p-0">
+                <div class="table-responsive" id="inspection-history-container">
+                    <div class="text-center py-4 text-muted">加载巡查历史...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mt-3">
     <div class="col-md-12">
         <div class="card">
             <div class="card-header">各磨损等级月度数量分布</div>
             <div class="card-body">
-                <div class="chart-container">
+                <div class="chart-container" style="position:relative;height:340px;">
                     <canvas id="wearDistributionChart"></canvas>
                 </div>
             </div>
@@ -64,6 +99,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const selectedPointId = {% if selected_point_id %}{{ selected_point_id }}{% else %}null{% endif %};
     const labels = {{ labels|safe }};
     const roadData = {{ road_data|safe }};
     const wearCountData = {{ wear_count_data|safe }};
@@ -80,69 +116,214 @@ document.addEventListener('DOMContentLoaded', function() {
         '#6f42c1'
     ];
 
-    const trendDatasets = roadData.map((road, idx) => ({
-        label: road.name,
-        data: road.data,
-        borderColor: colors[idx % colors.length],
-        backgroundColor: colors[idx % colors.length] + '33',
-        tension: 0.3,
-        fill: false,
-        pointRadius: 5,
-        pointHoverRadius: 7
-    }));
+    if (selectedPointId) {
+        loadPointWearHistory(selectedPointId);
+    } else {
+        renderMonthlyTrendChart(labels, roadData);
+    }
 
-    new Chart(document.getElementById('wearTrendChart'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: trendDatasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const val = context.parsed.y;
-                            let levelText = '';
-                            if (val >= 3.5) levelText = ' (严重)';
-                            else if (val >= 2.5) levelText = ' (较重)';
-                            else if (val >= 1.5) levelText = ' (一般)';
-                            else if (val > 0) levelText = ' (轻微)';
-                            return context.dataset.label + ': ' + val.toFixed(2) + levelText;
+    renderDistributionChart(labels, wearCountData, wearLevelChoices);
+
+    function renderMonthlyTrendChart(labelList, dataList) {
+        const trendDatasets = dataList.map((road, idx) => ({
+            label: road.name,
+            data: road.data,
+            borderColor: colors[idx % colors.length],
+            backgroundColor: colors[idx % colors.length] + '33',
+            tension: 0.3,
+            fill: false,
+            pointRadius: 5,
+            pointHoverRadius: 7
+        }));
+
+        new Chart(document.getElementById('wearTrendChart'), {
+            type: 'line',
+            data: {
+                labels: labelList,
+                datasets: trendDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.parsed.y;
+                                let levelText = '';
+                                if (val >= 3.5) levelText = ' (严重)';
+                                else if (val >= 2.5) levelText = ' (较重)';
+                                else if (val >= 1.5) levelText = ' (一般)';
+                                else if (val > 0) levelText = ' (轻微)';
+                                return context.dataset.label + ': ' + val.toFixed(2) + levelText;
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                y: {
-                    min: 0,
-                    max: 4.5,
-                    ticks: {
-                        stepSize: 1,
-                        callback: function(value) {
-                            const map = {0: '无', 1: '轻微', 2: '一般', 3: '较重', 4: '严重'};
-                            return map[value] || value;
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 4.5,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                const map = {0: '无', 1: '轻微', 2: '一般', 3: '较重', 4: '严重'};
+                                return map[value] || value;
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '平均磨损等级'
                         }
                     },
-                    title: {
-                        display: true,
-                        text: '平均磨损等级'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: '月份'
+                    x: {
+                        title: {
+                            display: true,
+                            text: '月份'
+                        }
                     }
                 }
             }
+        });
+    }
+
+    function loadPointWearHistory(pointPk) {
+        const apiUrl = "{% url 'roads:api_point_wear_history' point_pk=0 %}".replace('0', pointPk);
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                renderPointHistoryChart(data);
+                renderInspectionHistoryTable(data);
+            })
+            .catch(err => {
+                document.getElementById('wearTrendChart').parentElement.innerHTML =
+                    '<div class="text-center py-4 text-danger">加载点位历史数据失败</div>';
+            });
+    }
+
+    function renderPointHistoryChart(data) {
+        const levelColors = { 1: '#28a745', 2: '#ffc107', 3: '#fd7e14', 4: '#dc3545' };
+        const bgColors = { 1: '#28a74533', 2: '#ffc10733', 3: '#fd7e1433', 4: '#dc354533' };
+
+        const pointData = data.wear_data.map((level, idx) => ({
+            x: idx,
+            y: level,
+            date: data.labels[idx],
+            level: level
+        }));
+
+        new Chart(document.getElementById('wearTrendChart'), {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: data.point.code + ' ' + data.point.name + ' 磨损等级',
+                    data: data.wear_data,
+                    borderColor: '#8b7355',
+                    backgroundColor: '#d4a57466',
+                    tension: 0.25,
+                    fill: true,
+                    pointRadius: 7,
+                    pointHoverRadius: 9,
+                    pointBackgroundColor: data.wear_data.map(l => levelColors[l] || '#6c757d'),
+                    pointBorderColor: data.wear_data.map(l => levelColors[l] || '#6c757d'),
+                    pointBorderWidth: 2,
+                    borderWidth: 2.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(items) {
+                                return '巡查日期: ' + items[0].label;
+                            },
+                            label: function(context) {
+                                const level = context.parsed.y;
+                                return '磨损等级: ' + level + ' - ' + (wearLevelChoices[level] || '未知');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 4.5,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                const map = {0: '无', 1: '轻微', 2: '一般', 3: '较重', 4: '严重'};
+                                return map[value] || value;
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '磨损等级'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '巡查日期'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderInspectionHistoryTable(data) {
+        const container = document.getElementById('inspection-history-container');
+        if (!data.inspections || data.inspections.length === 0) {
+            container.innerHTML = '<div class="text-center py-4 text-muted">该点位暂无巡查记录</div>';
+            return;
         }
-    });
+        buildHistoryTable(container, data.inspections);
+    }
+
+    function buildHistoryTable(container, inspections) {
+        const levelColors = { 1: 'success', 2: 'warning', 3: 'warning', 4: 'danger' };
+        const rows = inspections.map(insp => {
+            const badge = `<span class="badge bg-${levelColors[insp.wear_level] || 'secondary'}">${wearLevelChoices[insp.wear_level] || '未知'} (${insp.wear_level})</span>`;
+            const handledBadge = insp.handled
+                ? '<span class="badge bg-success">已处理</span>'
+                : '<span class="badge bg-danger">未处理</span>';
+            const link = insp.id
+                ? `<a href="/inspections/${insp.id}/" class="btn btn-sm btn-outline-primary">查看</a>`
+                : '<span class="text-muted">—</span>';
+            return `<tr>
+                <td>${insp.inspection_date}</td>
+                <td>${badge}</td>
+                <td>${insp.inspector || '<span class="text-muted">—</span>'}</td>
+                <td>${handledBadge}</td>
+                <td>${link}</td>
+            </tr>`;
+        }).join('');
+        container.innerHTML = buildTableHTML(rows);
+    }
+
+    function buildTableHTML(rows) {
+        return `<table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:160px;">巡查日期</th>
+                    <th>磨损等级</th>
+                    <th>巡查员</th>
+                    <th style="width:100px;">处理状态</th>
+                    <th style="width:100px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    }
 
     const distColors = {
         1: '#28a745',
@@ -158,40 +339,49 @@ document.addEventListener('DOMContentLoaded', function() {
         borderRadius: 4
     }));
 
-    new Chart(document.getElementById('wearDistributionChart'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: distDatasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
+    function renderDistributionChart(labelList, countData, choices) {
+        const distDatasetsLocal = Object.entries(countData).map(([level, data]) => ({
+            label: choices[parseInt(level)],
+            data: data,
+            backgroundColor: distColors[parseInt(level)] || '#6c757d',
+            borderRadius: 4
+        }));
+
+        new Chart(document.getElementById('wearDistributionChart'), {
+            type: 'bar',
+            data: {
+                labels: labelList,
+                datasets: distDatasetsLocal
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: '巡查记录数'
-                    },
-                    ticks: {
-                        precision: 0
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
                     }
                 },
-                x: {
-                    title: {
-                        display: true,
-                        text: '月份'
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '巡查记录数'
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '月份'
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+    }
 });
 </script>
 {% endblock %}

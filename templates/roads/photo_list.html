@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}照片档案 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">照片档案</li>
+    </ol>
+</nav>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label">路段</label>
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for r in roads %}
+                <option value="{{ r.pk }}" {% if road_filter == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">点位</label>
+            <select name="point" class="form-select">
+                <option value="">全部点位</option>
+                {% for p in points %}
+                <option value="{{ p.pk }}" {% if point_filter == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.code }} - {{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">照片类型</label>
+            <select name="type" class="form-select">
+                <option value="">全部类型</option>
+                <option value="inspection" {% if type_filter == "inspection" %}selected{% endif %}>巡查照片</option>
+                <option value="damage" {% if type_filter == "damage" %}selected{% endif %}>破损照片</option>
+                <option value="rectification" {% if type_filter == "rectification" %}selected{% endif %}>整改照片</option>
+                <option value="verification" {% if type_filter == "verification" %}selected{% endif %}>复核照片</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">上传日期起</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from_filter }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">上传日期止</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to_filter }}">
+        </div>
+        <div class="col-md-2 text-end">
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{% url 'roads:photo_list' %}" class="btn btn-outline-secondary">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>照片档案 <small class="text-muted">(共 {{ photos|length }} 张)</small></h4>
+    <a href="{% url 'roads:photo_upload' %}" class="btn btn-primary">+ 上传照片</a>
+</div>
+
+{% if photos %}
+<div class="row photo-grid">
+    {% for photo in photos %}
+    <div class="col-md-3 mb-4">
+        <a href="{% url 'roads:photo_detail' photo.pk %}" class="text-decoration-none text-dark">
+            <div class="card photo-card h-100">
+                <img src="{{ photo.image.url }}" class="card-img-top img-fluid" alt="{{ photo.caption }}" style="height: 180px; object-fit: cover;">
+                <div class="card-body">
+                    <div class="mb-2">
+                        {% if photo.photo_type == 'inspection' %}
+                        <span class="badge bg-primary">巡查照片</span>
+                        {% elif photo.photo_type == 'damage' %}
+                        <span class="badge bg-danger">破损照片</span>
+                        {% elif photo.photo_type == 'rectification' %}
+                        <span class="badge bg-warning text-dark">整改照片</span>
+                        {% elif photo.photo_type == 'verification' %}
+                        <span class="badge bg-success">复核照片</span>
+                        {% endif %}
+                    </div>
+                    <p class="card-text small mb-2" style="color: #555;">{{ photo.caption|default:"(无说明)" }}</p>
+                    <p class="card-text small mb-1">
+                        <a href="{% url 'roads:point_detail' photo.point.pk %}" class="text-muted text-decoration-none">
+                            📍 {{ photo.point.code }} {{ photo.point.name }}
+                        </a>
+                    </p>
+                    <p class="card-text small text-muted mb-0">{{ photo.uploaded_at|date:"Y-m-d H:i" }}</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <div class="display-1 text-muted mb-3">🖼️</div>
+        <h5 class="text-muted">暂无照片数据</h5>
+        <p class="text-muted small mb-3">请点击右上角"上传照片"按钮添加新的照片档案</p>
+        <a href="{% url 'roads:photo_upload' %}" class="btn btn-primary">上传照片</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

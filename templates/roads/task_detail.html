@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+
+{% block title %}工单详情 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:task_list' %}">整改闭环</a></li>
+        <li class="breadcrumb-item active">详情</li>
+    </ol>
+</nav>
+
+{% if task.is_overdue %}
+<div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-triangle-fill me-2" viewBox="0 0 16 16">
+        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+    </svg>
+    <div>
+        <strong>工单已超期！</strong> 整改期限为 {{ task.deadline }}，请尽快处理。
+    </div>
+</div>
+{% endif %}
+
+<div class="card mb-4 {% if task.is_overdue %}border-danger{% endif %}">
+    <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="mb-2">{{ task.title }}</h3>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-muted">工单编号：#{{ task.pk|stringformat:"06d" }}</span>
+                {% if task.priority == 'urgent' %}
+                <span class="badge badge-priority-紧急 fs-6">紧急</span>
+                {% elif task.priority == 'high' %}
+                <span class="badge badge-priority-高 fs-6">高优先级</span>
+                {% elif task.priority == 'medium' %}
+                <span class="badge badge-priority-中 fs-6">中优先级</span>
+                {% elif task.priority == 'low' %}
+                <span class="badge badge-priority-低 fs-6">低优先级</span>
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            {% if task.status == 'pending' %}
+            <span class="badge bg-secondary fs-5 px-4 py-2">{{ task_status_choices.pending }}</span>
+            {% elif task.status == 'dispatched' %}
+            <span class="badge bg-info fs-5 px-4 py-2">{{ task_status_choices.dispatched }}</span>
+            {% elif task.status == 'rectifying' %}
+            <span class="badge bg-warning text-dark fs-5 px-4 py-2">{{ task_status_choices.rectifying }}</span>
+            {% elif task.status == 'pending_review' %}
+            <span class="badge fs-5 px-4 py-2 text-white" style="background: #7c3aed;">{{ task_status_choices.pending_review }}</span>
+            {% elif task.status == 'closed' %}
+            <span class="badge bg-success fs-5 px-4 py-2">{{ task_status_choices.closed }}</span>
+            {% elif task.status == 'rejected' %}
+            <span class="badge bg-danger fs-5 px-4 py-2">{{ task_status_choices.rejected }}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">处理进度</div>
+    <div class="card-body py-4">
+        <div class="stepper d-flex justify-content-between align-items-start">
+            {% for step in task.get_progress_steps %}
+            <div class="step-item text-center flex-fill position-relative">
+                <div class="step-circle mx-auto mb-2 d-flex align-items-center justify-content-center rounded-circle {% if step.done %}bg-success text-white{% else %}bg-light text-muted border border-3 border-muted{% endif %}" style="width: 48px; height: 48px; font-size: 1.25rem; font-weight: 600;">
+                    {% if step.done %}✓{% else %}{{ forloop.counter }}{% endif %}
+                </div>
+                <div class="step-label fw-bold {% if step.done %}text-success{% else %}text-muted{% endif %}">{{ step.label }}</div>
+                <div class="step-time small text-muted mt-1">
+                    {% if step.time %}
+                        {% if step.time|date:"Y-m-d" %}{{ step.time|date:"Y-m-d" }}{% else %}{{ step.time }}{% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+            {% if not forloop.last %}
+            <div class="step-line position-absolute top-6 start-100 w-100" style="height: 3px; top: 24px; background: {% if task.get_progress_steps|slice:forloop.counter0|last and task.get_progress_steps|slice:forloop.counter|last and task.get_progress_steps|slice:forloop.counter0|last.done %}#198754{% else %}#e9ecef{% endif %}; transform: translateY(-50%); z-index: -1;"></div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">工单详情</div>
+            <div class="card-body">
+                <div class="info-section">
+                    <h6>基础信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">工单标题</span>
+                        <span class="info-value">{{ task.title }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">工单描述</span>
+                        <span class="info-value" style="white-space: pre-wrap;">{{ task.description|default:"-" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">优先级</span>
+                        <span class="info-value">
+                            {% if task.priority == 'urgent' %}
+                            <span class="badge badge-priority-紧急">紧急</span>
+                            {% elif task.priority == 'high' %}
+                            <span class="badge badge-priority-高">高</span>
+                            {% elif task.priority == 'medium' %}
+                            <span class="badge badge-priority-中">中</span>
+                            {% elif task.priority == 'low' %}
+                            <span class="badge badge-priority-低">低</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">指派人员</span>
+                        <span class="info-value">{{ task.assigned_to|default:"-" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">派发说明</span>
+                        <span class="info-value" style="white-space: pre-wrap;">{{ task.dispatch_note|default:"-" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">整改期限</span>
+                        <span class="info-value">
+                            {% if task.deadline %}
+                            <span class="{% if task.is_overdue %}text-danger fw-bold{% endif %}">{{ task.deadline }}</span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h6>时间节点</h6>
+                    <div class="info-row">
+                        <span class="info-label">创建时间</span>
+                        <span class="info-value">{{ task.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">派发时间</span>
+                        <span class="info-value">{{ task.dispatched_at|date:"Y-m-d H:i"|default:"-" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">整改完成时间</span>
+                        <span class="info-value">{{ task.rectified_at|date:"Y-m-d H:i"|default:"-" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">复核时间</span>
+                        <span class="info-value">{{ task.reviewed_at|date:"Y-m-d H:i"|default:"-" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">闭环时间</span>
+                        <span class="info-value">{{ task.closed_at|date:"Y-m-d H:i"|default:"-" }}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h6>关联信息</h6>
+                    <div class="info-row">
+                        <span class="info-label">点位</span>
+                        <span class="info-value">
+                            <a href="{% url 'roads:point_detail' task.point.pk %}">
+                                <code>{{ task.point.code }}</code> {{ task.point.name }}
+                            </a>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">所属路段</span>
+                        <span class="info-value">{{ task.point.road_section.name }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">关联巡查记录</span>
+                        <span class="info-value">
+                            <a href="{% url 'roads:inspection_detail' task.inspection.pk %}">
+                                {{ task.inspection.inspection_date }} -
+                                <span class="badge badge-wear-{{ task.inspection.wear_level }}">{{ task.inspection.get_wear_level_display }}</span>
+                            </a>
+                        </span>
+                    </div>
+                </div>
+
+                {% if task.rectification_result %}
+                <div class="info-section">
+                    <h6>整改结果</h6>
+                    <div class="alert alert-info" style="white-space: pre-wrap;">{{ task.rectification_result }}</div>
+                </div>
+                {% endif %}
+
+                {% if task.review_note %}
+                <div class="info-section">
+                    <h6>复核意见</h6>
+                    <div class="info-row">
+                        <span class="info-label">复核人</span>
+                        <span class="info-value">{{ task.reviewer|default:"-" }}</span>
+                    </div>
+                    <div class="alert {% if task.status == 'closed' %}alert-success{% else %}alert-warning{% endif %}" style="white-space: pre-wrap;">{{ task.review_note }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% with rectification_photos=photos|dictsortreversed:"uploaded_at" %}
+        {% if rectification_photos %}
+        <div class="card mb-4">
+            <div class="card-header">照片资料</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for photo in rectification_photos %}
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100">
+                            <img src="{{ photo.image.url }}" class="card-img-top" alt="{{ photo.caption }}" style="height: 180px; object-fit: cover;">
+                            <div class="card-body p-2">
+                                <div class="small">
+                                    {% if photo.photo_type == 'rectification' %}
+                                    <span class="badge bg-warning text-dark">整改照片</span>
+                                    {% elif photo.photo_type == 'verification' %}
+                                    <span class="badge bg-purple text-white" style="background: #7c3aed;">复核照片</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ photo.get_photo_type_display }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="small text-muted mt-1">{{ photo.caption|default:photo.image.name }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">操作</div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if task.status == 'pending' %}
+                    <a href="{% url 'roads:task_dispatch' task.pk %}" class="btn btn-info btn-lg">派打工单</a>
+                    {% elif task.status == 'dispatched' or task.status == 'rectifying' or task.status == 'rejected' %}
+                    <a href="{% url 'roads:task_rectify' task.pk %}" class="btn btn-warning btn-lg">提交整改</a>
+                    {% elif task.status == 'pending_review' %}
+                    <a href="{% url 'roads:task_review' task.pk %}" class="btn btn-lg text-white" style="background: #7c3aed;">复核工单</a>
+                    {% endif %}
+                    <a href="{% url 'roads:task_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

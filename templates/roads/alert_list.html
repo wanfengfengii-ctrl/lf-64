@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}风险预警 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">风险预警</li>
+    </ol>
+</nav>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label">预警等级</label>
+            <select name="level" class="form-select">
+                <option value="">全部等级</option>
+                {% for val, label in alert_level_choices.items %}
+                <option value="{{ val }}" {% if level_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">预警类型</label>
+            <select name="type" class="form-select">
+                <option value="">全部类型</option>
+                {% for val, label in alert_type_choices.items %}
+                <option value="{{ val }}" {% if type_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">状态</label>
+            <select name="status" class="form-select">
+                <option value="">全部</option>
+                <option value="unread" {% if status_filter == "unread" %}selected{% endif %}>未读</option>
+                <option value="unresolved" {% if status_filter == "unresolved" %}selected{% endif %}>未处理</option>
+                <option value="resolved" {% if status_filter == "resolved" %}selected{% endif %}>已处理</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">所属路段</label>
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for r in roads %}
+                <option value="{{ r.pk }}" {% if road_filter == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.code }} - {{ r.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 text-end">
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{% url 'roads:alert_list' %}" class="btn btn-outline-secondary">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="d-inline">风险预警</h4>
+        <span class="ms-3">
+            <span class="badge bg-secondary me-1">总数: {{ alerts|length }}</span>
+            <span class="badge bg-warning text-dark me-1">未读: {{ alerts_unread_count }}</span>
+            <span class="badge bg-danger me-1">未处理: {{ alerts_unresolved_count }}</span>
+            <span class="badge bg-success">已处理: {{ alerts_resolved_count }}</span>
+        </span>
+    </div>
+    <div>
+        <form method="post" action="{% url 'roads:alert_generate_auto' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-warning">⚡ 自动生成预警</button>
+        </form>
+        <a href="{% url 'roads:alert_create' %}" class="btn btn-primary">+ 手动创建预警</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>预警等级</th>
+                    <th>预警类型</th>
+                    <th>路段</th>
+                    <th>点位</th>
+                    <th>预警信息</th>
+                    <th>已读</th>
+                    <th>已处理</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in alerts %}
+                <tr>
+                    <td>
+                        {% if alert.alert_level == 'critical' %}
+                        <span class="badge bg-danger">紧急</span>
+                        {% elif alert.alert_level == 'warning' %}
+                        <span class="badge bg-warning text-dark">警告</span>
+                        {% else %}
+                        <span class="badge bg-info">提示</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if alert.alert_type == 'wear_critical' %}严重磨损预警
+                        {% elif alert.alert_type == 'wear_worsening' %}磨损恶化趋势
+                        {% elif alert.alert_type == 'task_overdue' %}工单超期预警
+                        {% elif alert.alert_type == 'unhandled_long' %}长期未处理预警
+                        {% endif %}
+                    </td>
+                    <td>{{ alert.point.road_section.name }}</td>
+                    <td><a href="{% url 'roads:point_detail' alert.point.pk %}"><code>{{ alert.point.code }}</code> {{ alert.point.name }}</a></td>
+                    <td style="max-width: 280px;" title="{{ alert.message }}">
+                        {% if alert.message|length > 100 %}{{ alert.message|slice:":100" }}...{% else %}{{ alert.message }}{% endif %}
+                    </td>
+                    <td>
+                        {% if alert.is_read %}
+                        <span class="badge bg-success">已读</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">未读</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if alert.is_resolved %}
+                        <span class="badge bg-success">已处理</span>
+                        {% else %}
+                        <span class="badge bg-danger">未处理</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ alert.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <a href="{% url 'roads:alert_detail' alert.pk %}" class="btn btn-sm btn-outline-primary">查看详情</a>
+                        {% if not alert.is_read %}
+                        <form method="post" action="{% url 'roads:alert_mark_read' alert.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-warning">标记已读</button>
+                        </form>
+                        {% endif %}
+                        {% if not alert.is_resolved %}
+                        <form method="post" action="{% url 'roads:alert_resolve' alert.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-success">标记处理</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted">暂无预警记录</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

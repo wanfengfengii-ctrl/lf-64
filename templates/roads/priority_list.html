@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}维护优先级清单 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item active">维护优先级清单</li>
+    </ol>
+</nav>
+
+<h4 class="mb-3">维护优先级清单</h4>
+
+<div class="row mb-4">
+    <div class="col-md-2">
+        <span class="badge bg-danger d-block py-3 px-2" style="font-size: 1rem;">
+            紧急
+            <div style="font-size: 1.8rem; font-weight: 700;">{{ stats.urgent }}</div>
+        </span>
+    </div>
+    <div class="col-md-2">
+        <span class="badge bg-warning text-dark d-block py-3 px-2" style="font-size: 1rem;">
+            高
+            <div style="font-size: 1.8rem; font-weight: 700;">{{ stats.high }}</div>
+        </span>
+    </div>
+    <div class="col-md-2">
+        <span class="badge bg-info d-block py-3 px-2" style="font-size: 1rem;">
+            中
+            <div style="font-size: 1.8rem; font-weight: 700;">{{ stats.medium }}</div>
+        </span>
+    </div>
+    <div class="col-md-2">
+        <span class="badge bg-secondary d-block py-3 px-2" style="font-size: 1rem;">
+            低
+            <div style="font-size: 1.8rem; font-weight: 700;">{{ stats.low }}</div>
+        </span>
+    </div>
+    <div class="col-md-2">
+        <span class="badge bg-success d-block py-3 px-2" style="font-size: 1rem;">
+            已开工单
+            <div style="font-size: 1.8rem; font-weight: 700;">{{ stats.has_task }}</div>
+        </span>
+    </div>
+    <div class="col-md-2">
+        <span class="badge bg-light text-dark d-block py-3 px-2" style="font-size: 1rem; border: 1px solid #dee2e6;">
+            未开工单
+            <div style="font-size: 1.8rem; font-weight: 700;">{{ stats.no_task }}</div>
+        </span>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="text-muted small">
+        💡 按优先级得分降序排列，得分越高越需优先处理；可批量查看并通过"创建工单"按钮派发整改任务。
+    </div>
+    <a href="{% url 'roads:export' %}" class="btn btn-outline-primary">📊 数据导出</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">排名</th>
+                    <th>优先级</th>
+                    <th>路段</th>
+                    <th>点位</th>
+                    <th>磨损等级</th>
+                    <th>巡查日期</th>
+                    <th>维护建议</th>
+                    <th>工单状态</th>
+                    <th>优先级得分</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in priority_items %}
+                <tr>
+                    <td><strong class="fs-5">{{ forloop.counter }}</strong></td>
+                    <td>
+                        <span class="badge bg-{{ item.priority_class }}" style="font-size: 0.95rem; padding: 0.5em 1em;">
+                            {{ item.priority }}
+                        </span>
+                    </td>
+                    <td>{{ item.inspection.point.road_section.name }}</td>
+                    <td>
+                        <a href="{% url 'roads:point_detail' item.inspection.point.pk %}">
+                            <code>{{ item.inspection.point.code }}</code> {{ item.inspection.point.name }}
+                        </a>
+                    </td>
+                    <td><span class="badge badge-wear-{{ item.inspection.wear_level }}">{{ item.inspection.get_wear_level_display }}</span></td>
+                    <td>
+                        {{ item.inspection.inspection_date }}
+                        {% if item.days_pending > 30 %}
+                        <br><span class="text-danger fw-bold">超期 {{ item.days_pending }} 天</span>
+                        {% else %}
+                        <br><small class="text-muted">已等待 {{ item.days_pending }} 天</small>
+                        {% endif %}
+                    </td>
+                    <td style="max-width: 250px;">
+                        <small>{{ item.inspection.maintenance_suggestion|default:"-"|truncatechars:60 }}</small>
+                    </td>
+                    <td>
+                        {% if item.has_task %}
+                        <span class="badge bg-success">
+                            <a href="{% url 'roads:task_detail' item.has_task.pk %}" class="text-white text-decoration-none">✓ 已开工单</a>
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary">未开工单</span>
+                        <a href="{% url 'roads:task_create_from_insp' item.inspection.pk %}" class="btn btn-sm btn-outline-success ms-2">创建工单</a>
+                        {% endif %}
+                    </td>
+                    <td><strong class="fs-5 text-primary">{{ item.priority_score }}</strong></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted py-4">暂无待处理的维护项</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

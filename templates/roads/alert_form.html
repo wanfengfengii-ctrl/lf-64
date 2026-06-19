@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}手动创建预警 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:alert_list' %}">风险预警</a></li>
+        <li class="breadcrumb-item active">手动创建预警</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">手动创建预警</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.point.label }} <span class="text-danger">*</span></label>
+                        {{ form.point }}
+                        {% if form.point.errors %}
+                        <div class="text-danger small">{{ form.point.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.alert_type.label }} <span class="text-danger">*</span></label>
+                                {{ form.alert_type }}
+                                {% if form.alert_type.errors %}
+                                <div class="text-danger small">{{ form.alert_type.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.alert_level.label }} <span class="text-danger">*</span></label>
+                                {{ form.alert_level }}
+                                {% if form.alert_level.errors %}
+                                <div class="text-danger small">{{ form.alert_level.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.message.label }} <span class="text-danger">*</span></label>
+                        {{ form.message }}
+                        {% if form.message.errors %}
+                        <div class="text-danger small">{{ form.message.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:alert_list' %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">创建</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
