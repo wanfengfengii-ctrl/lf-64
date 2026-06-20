@@ -820,6 +820,15 @@ body {
 .badge-control-detour { background: #f5c6cb; color: #721c24; }
 .badge-control-full_closure { background: #f8d7da; color: #721c24; font-weight: 700; }
 
+.badge-hazard-stone_step { background: #d1ecf1; color: #0c5460; }
+.badge-hazard-slope { background: #e2d9f3; color: #4a235a; }
+.badge-hazard-drainage { background: #d4edda; color: #155724; }
+.badge-hazard-bridge_culvert { background: #fff3cd; color: #856404; }
+.badge-hazard-retaining_wall { background: #ffe5d0; color: #8a4a00; }
+.badge-hazard-tunnel { background: #d6d8db; color: #383d41; }
+.badge-hazard-road_surface { background: #f8d7da; color: #721c24; }
+.badge-hazard-other { background: #f5f5f5; color: #5c4033; }
+
 .hazard-progress-bar {
     height: 8px;
     background: #e9ecef;

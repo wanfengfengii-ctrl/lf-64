@@ -89,7 +89,7 @@
             <select name="road" class="form-select">
                 <option value="">全部路段</option>
                 {% for road in roads %}
-                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"s" %}selected{% endif %}>{{ road.code }} - {{ road.name }}</option>
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"%s" %}selected{% endif %}>{{ road.code }} - {{ road.name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -148,7 +148,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge badge-type-{{ hz.location_type }}">{{ location_type_choices|get_item:hz.location_type }}</span>
+                            <span class="badge badge-hazard-{{ hz.location_type }}">{{ location_type_choices|get_item:hz.location_type }}</span>
                             <div class="mt-1"><small>{{ hazard_type_choices|get_item:hz.hazard_type }}</small></div>
                         </td>
                         <td>
@@ -168,7 +168,7 @@
                         </td>
                         <td>
                             <div>{{ hz.reported_by }}</div>
-                            <div class="text-muted small">{{ hz.reported_date|date:"m-d H:i" }}</div>
+                            <div class="text-muted small">{{ hz.reported_at|date:"m-d H:i" }}</div>
                         </td>
                         <td style="min-width:120px;">
                             <div class="hazard-progress-bar">

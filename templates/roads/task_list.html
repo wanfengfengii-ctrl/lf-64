@@ -36,7 +36,7 @@
             <select name="road" class="form-select">
                 <option value="">全部路段</option>
                 {% for r in roads %}
-                <option value="{{ r.pk }}" {% if road_filter == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.code }} - {{ r.name }}</option>
+                <option value="{{ r.pk }}" {% if road_filter == r.pk|stringformat:"%s" %}selected{% endif %}>{{ r.code }} - {{ r.name }}</option>
                 {% endfor %}
             </select>
         </div>
