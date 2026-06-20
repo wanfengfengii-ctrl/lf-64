@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}开放时段计划 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">📅 开放时段计划</h3>
+    <div>
+        <a href="{% url 'roads:open_schedule_create' %}" class="btn btn-primary">+ 新建计划</a>
+        <a href="{% url 'roads:open_status_dashboard' %}" class="btn btn-outline-info ms-2">📊 开放状态总览</a>
+    </div>
+</div>
+
+<div class="quick-stats-grid">
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#0d6efd;">{{ stats.total }}</div>
+        <div class="quick-stat-label">📋 计划总数</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#28a745;">{{ stats.active }}</div>
+        <div class="quick-stat-label">✅ 启用中</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#6c757d;">{{ stats.inactive }}</div>
+        <div class="quick-stat-label">⏸️ 已停用</div>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">路段筛选</label>
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for road in roads %}
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"%s" %}selected{% endif %}>
+                    {{ road.code }} - {{ road.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">适用季节</label>
+            <select name="season" class="form-select">
+                <option value="">全部季节</option>
+                {% for val, label in season_choices.items %}
+                <option value="{{ val }}" {% if season_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">适用天气</label>
+            <select name="weather" class="form-select">
+                <option value="">全部天气</option>
+                {% for val, label in weather_choices.items %}
+                <option value="{{ val }}" {% if weather_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">养护状态</label>
+            <select name="maintenance" class="form-select">
+                <option value="">全部状态</option>
+                {% for val, label in maintenance_choices.items %}
+                <option value="{{ val }}" {% if maintenance_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 text-end">
+            <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+            <a href="{% url 'roads:open_schedule_list' %}" class="btn btn-outline-secondary btn-sm">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>路段编号</th>
+                    <th>路段名称</th>
+                    <th>适用季节</th>
+                    <th>适用天气</th>
+                    <th>养护状态</th>
+                    <th>开放时间</th>
+                    <th>关闭时间</th>
+                    <th>最大承载</th>
+                    <th>分时容量</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in schedules %}
+                <tr>
+                    <td><code>{{ s.road_section.code }}</code></td>
+                    <td>{{ s.road_section.name }}</td>
+                    <td>{{ s.get_season_display }}</td>
+                    <td>{{ s.get_weather_condition_display }}</td>
+                    <td>
+                        <span class="badge {% if s.maintenance_status == 'normal' %}bg-success{% elif s.maintenance_status == 'maintaining' %}bg-warning text-dark{% elif s.maintenance_status == 'repairing' %}bg-orange{% else %}bg-danger{% endif %}">
+                            {{ s.get_maintenance_status_display }}
+                        </span>
+                    </td>
+                    <td>{{ s.open_time|time:"H:i" }}</td>
+                    <td>{{ s.close_time|time:"H:i" }}</td>
+                    <td>{{ s.max_capacity }}人</td>
+                    <td>
+                        {% if s.slot_max_capacity > 0 %}
+                            {{ s.slot_max_capacity }}人/{{ s.time_slot_minutes }}分钟
+                        {% else %}
+                            <span class="text-muted">不限</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if s.is_active %}
+                        <span class="badge bg-success">启用</span>
+                        {% else %}
+                        <span class="badge bg-secondary">停用</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'roads:open_schedule_edit' s.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        <a href="{% url 'roads:open_schedule_delete' s.pk %}" class="btn btn-sm btn-outline-danger"
+                           onclick="return confirm('确定要删除该开放时段计划吗？')">删除</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="11" class="text-center text-muted py-4">暂无开放时段计划数据</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

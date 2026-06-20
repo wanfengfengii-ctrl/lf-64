@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'create' %}新建开放计划{% else %}编辑开放计划{% endif %} - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:open_schedule_list' %}">开放时段计划</a></li>
+        <li class="breadcrumb-item active">{% if mode == 'create' %}新建开放计划{% else %}编辑开放计划{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">{% if mode == 'create' %}➕ 新建开放计划{% else %}✏️ 编辑开放计划{% endif %}</h5>
+            </div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.road_section.label }} <span class="text-danger">*</span></label>
+                        {{ form.road_section }}
+                        {% if form.road_section.errors %}
+                        <div class="text-danger small">{{ form.road_section.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.season.label }} <span class="text-danger">*</span></label>
+                            {{ form.season }}
+                            {% if form.season.errors %}
+                            <div class="text-danger small">{{ form.season.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.weather_condition.label }} <span class="text-danger">*</span></label>
+                            {{ form.weather_condition }}
+                            {% if form.weather_condition.errors %}
+                            <div class="text-danger small">{{ form.weather_condition.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.maintenance_status.label }} <span class="text-danger">*</span></label>
+                            {{ form.maintenance_status }}
+                            {% if form.maintenance_status.errors %}
+                            <div class="text-danger small">{{ form.maintenance_status.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.open_time.label }} <span class="text-danger">*</span></label>
+                            {{ form.open_time }}
+                            {% if form.open_time.errors %}
+                            <div class="text-danger small">{{ form.open_time.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.close_time.label }} <span class="text-danger">*</span></label>
+                            {{ form.close_time }}
+                            {% if form.close_time.errors %}
+                            <div class="text-danger small">{{ form.close_time.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.max_capacity.label }} <span class="text-danger">*</span></label>
+                            {{ form.max_capacity }}
+                            {% if form.max_capacity.errors %}
+                            <div class="text-danger small">{{ form.max_capacity.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.time_slot_minutes.label }}</label>
+                            {{ form.time_slot_minutes }}
+                            {% if form.time_slot_minutes.errors %}
+                            <div class="text-danger small">{{ form.time_slot_minutes.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.slot_max_capacity.label }}</label>
+                        {{ form.slot_max_capacity }}
+                        <div class="form-text">0表示不设分时限流</div>
+                        {% if form.slot_max_capacity.errors %}
+                        <div class="text-danger small">{{ form.slot_max_capacity.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.is_active }}
+                            <label class="form-check-label ms-2" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="text-danger small">{{ form.description.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:open_schedule_list' %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary ms-2">{% if mode == 'create' %}创建{% else %}保存{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

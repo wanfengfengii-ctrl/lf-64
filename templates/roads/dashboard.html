@@ -108,6 +108,27 @@
     </div>
 </div>
 
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="mini-stat" style="background:#17a2b8;color:#fff;">
+            <div class="mini-stat-value">{{ active_schedules }}</div>
+            <div class="mini-stat-label">开放计划</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-warning text-white">
+            <div class="mini-stat-value">{{ active_controls }}</div>
+            <div class="mini-stat-label">临时管制</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat" style="background:#6f42c1;color:#fff;">
+            <div class="mini-stat-value">{{ today_flow_count }}</div>
+            <div class="mini-stat-label">今日客流</div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-8">
         <div class="card">
@@ -384,6 +405,7 @@
                 <a href="{% url 'roads:hazard_map' %}" class="btn btn-danger me-2">🗺️ 预警地图</a>
                 <a href="{% url 'roads:hazard_list' %}" class="btn btn-outline-danger me-2">⚠️ 灾害隐患</a>
                 <a href="{% url 'roads:passage_status_list' %}" class="btn btn-outline-success me-2">🚦 通行状态</a>
+                <a href="{% url 'roads:open_status_dashboard' %}" class="btn btn-outline-info me-2">📊 开放状态总览</a>
                 <a href="{% url 'roads:alert_generate_auto' %}" class="btn btn-warning me-2"
                    onclick="return confirm('确定要自动扫描并生成预警吗？')">🔍 自动生成风险预警</a>
                 <a href="{% url 'roads:priority_list' %}" class="btn btn-warning me-2">📋 维护优先级清单</a>

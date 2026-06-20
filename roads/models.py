@@ -119,6 +119,52 @@ DISPOSAL_TYPE_CHOICES = [
     ('other', '其他操作'),
 ]
 
+SEASON_CHOICES = [
+    ('spring', '春季'),
+    ('summer', '夏季'),
+    ('autumn', '秋季'),
+    ('winter', '冬季'),
+]
+
+WEATHER_CONDITION_CHOICES = [
+    ('sunny', '晴天'),
+    ('cloudy', '多云'),
+    ('rainy', '雨天'),
+    ('heavy_rain', '暴雨'),
+    ('snowy', '雪天'),
+    ('foggy', '雾天'),
+    ('icy', '冰冻'),
+]
+
+CONTROL_TYPE_CHOICES = [
+    ('full_closure', '全段封闭'),
+    ('partial_closure', '部分封闭'),
+    ('time_restriction', '时段限制'),
+    ('capacity_reduction', '减载限流'),
+    ('single_direction', '单向通行'),
+    ('guided_tour', '跟团游览'),
+]
+
+FLOW_RECORD_TYPE_CHOICES = [
+    ('entry', '进入'),
+    ('exit', '离开'),
+    ('count', '统计'),
+]
+
+OPEN_STATUS_CHOICES = [
+    ('open', '正常开放'),
+    ('partial', '部分开放'),
+    ('restricted', '限制开放'),
+    ('closed', '暂停开放'),
+]
+
+MAINTENANCE_STATUS_CHOICES = [
+    ('normal', '正常'),
+    ('maintaining', '养护中'),
+    ('repairing', '修缮中'),
+    ('emergency', '应急抢修'),
+]
+
 
 class RoadSection(models.Model):
     name = models.CharField('路段名称', max_length=200, unique=True)
@@ -782,3 +828,219 @@ class RoadPassageStatus(models.Model):
         self.passage_status = new_status
         self.save()
         return new_status
+
+
+class OpenSchedule(models.Model):
+    road_section = models.ForeignKey(
+        RoadSection,
+        on_delete=models.CASCADE,
+        related_name='open_schedules',
+        verbose_name='所属路段'
+    )
+    season = models.CharField(
+        '适用季节',
+        max_length=20,
+        choices=SEASON_CHOICES
+    )
+    weather_condition = models.CharField(
+        '适用天气',
+        max_length=20,
+        choices=WEATHER_CONDITION_CHOICES,
+        default='sunny'
+    )
+    maintenance_status = models.CharField(
+        '养护状态',
+        max_length=20,
+        choices=MAINTENANCE_STATUS_CHOICES,
+        default='normal'
+    )
+    open_time = models.TimeField('开放开始时间')
+    close_time = models.TimeField('开放结束时间')
+    max_capacity = models.IntegerField('最大承载人数')
+    time_slot_minutes = models.IntegerField(
+        '分时段时长(分钟)',
+        default=60
+    )
+    slot_max_capacity = models.IntegerField(
+        '分时段最大人数',
+        default=0,
+        help_text='0表示不设分时限流'
+    )
+    is_active = models.BooleanField('是否启用', default=True)
+    description = models.TextField('备注说明', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '开放时段计划'
+        verbose_name_plural = '开放时段计划'
+        ordering = ['road_section__code', 'season', '-is_active']
+
+    def __str__(self):
+        return f'{self.road_section.code} - {self.get_season_display()} {self.open_time}-{self.close_time}'
+
+    def clean(self):
+        if self.open_time and self.close_time and self.open_time >= self.close_time:
+            raise ValidationError({
+                'close_time': '开放结束时间必须晚于开始时间。'
+            })
+        if self.max_capacity is not None and self.max_capacity <= 0:
+            raise ValidationError({
+                'max_capacity': '最大承载人数必须大于0。'
+            })
+        if self.slot_max_capacity is not None and self.slot_max_capacity < 0:
+            raise ValidationError({
+                'slot_max_capacity': '分时段最大人数不能为负数。'
+            })
+        if self.slot_max_capacity > 0 and self.slot_max_capacity > self.max_capacity:
+            raise ValidationError({
+                'slot_max_capacity': '分时段最大人数不能超过最大承载人数。'
+            })
+
+    def get_current_open_status(self):
+        now = timezone.now()
+        current_time = now.time()
+        active_control = TemporaryControl.objects.filter(
+            road_section=self.road_section,
+            is_active=True,
+            start_time__lte=now,
+            end_time__gte=now
+        ).first()
+        if active_control:
+            return active_control.get_open_status_display()
+        if self.open_time <= current_time <= self.close_time:
+            return 'open'
+        return 'closed'
+
+
+class TemporaryControl(models.Model):
+    road_section = models.ForeignKey(
+        RoadSection,
+        on_delete=models.CASCADE,
+        related_name='temporary_controls',
+        verbose_name='所属路段'
+    )
+    control_type = models.CharField(
+        '管制类型',
+        max_length=30,
+        choices=CONTROL_TYPE_CHOICES
+    )
+    open_status = models.CharField(
+        '开放状态',
+        max_length=20,
+        choices=OPEN_STATUS_CHOICES,
+        default='restricted'
+    )
+    reason = models.TextField('管制原因')
+    start_time = models.DateTimeField('开始时间')
+    end_time = models.DateTimeField('预计结束时间')
+    adjusted_capacity = models.IntegerField(
+        '调整后承载人数',
+        null=True,
+        blank=True,
+        help_text='留空表示按原计划'
+    )
+    adjusted_open_time = models.TimeField(
+        '调整后开放时间',
+        null=True,
+        blank=True
+    )
+    adjusted_close_time = models.TimeField(
+        '调整后关闭时间',
+        null=True,
+        blank=True
+    )
+    is_active = models.BooleanField('是否生效中', default=True)
+    issued_by = models.CharField('发布人', max_length=100)
+    notice_public = models.TextField('对外公告内容', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '临时管制'
+        verbose_name_plural = '临时管制'
+        ordering = ['-start_time']
+
+    def __str__(self):
+        return f'{self.road_section.code} - {self.get_control_type_display()} ({self.start_time:%Y-%m-%d})'
+
+    def clean(self):
+        if self.start_time and self.end_time and self.start_time >= self.end_time:
+            raise ValidationError({
+                'end_time': '预计结束时间必须晚于开始时间。'
+            })
+        if self.adjusted_capacity is not None and self.adjusted_capacity <= 0:
+            raise ValidationError({
+                'adjusted_capacity': '调整后承载人数必须大于0。'
+            })
+        if self.adjusted_open_time and self.adjusted_close_time:
+            if self.adjusted_open_time >= self.adjusted_close_time:
+                raise ValidationError({
+                    'adjusted_close_time': '调整后关闭时间必须晚于开放时间。'
+                })
+
+    def is_currently_active(self):
+        now = timezone.now()
+        return self.is_active and self.start_time <= now <= self.end_time
+
+    def deactivate(self):
+        self.is_active = False
+        self.save()
+
+
+class VisitorFlowRecord(models.Model):
+    road_section = models.ForeignKey(
+        RoadSection,
+        on_delete=models.CASCADE,
+        related_name='visitor_flows',
+        verbose_name='所属路段'
+    )
+    record_date = models.DateField('记录日期')
+    record_time = models.TimeField('记录时间')
+    record_type = models.CharField(
+        '记录类型',
+        max_length=20,
+        choices=FLOW_RECORD_TYPE_CHOICES,
+        default='count'
+    )
+    visitor_count = models.IntegerField('游客数量')
+    current_occupancy = models.IntegerField(
+        '当前在段人数',
+        default=0
+    )
+    weather = models.CharField(
+        '天气状况',
+        max_length=20,
+        choices=WEATHER_CONDITION_CHOICES,
+        default='sunny'
+    )
+    notes = models.TextField('备注', blank=True)
+    recorded_by = models.CharField('记录人', max_length=100)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    class Meta:
+        verbose_name = '客流记录'
+        verbose_name_plural = '客流记录'
+        ordering = ['-record_date', '-record_time']
+
+    def __str__(self):
+        return f'{self.road_section.code} - {self.record_date} {self.record_time} ({self.visitor_count})'
+
+    def clean(self):
+        if self.visitor_count < 0:
+            raise ValidationError({
+                'visitor_count': '游客数量不能为负数。'
+            })
+        if self.current_occupancy < 0:
+            raise ValidationError({
+                'current_occupancy': '当前在段人数不能为负数。'
+            })
+
+    def get_capacity_usage(self):
+        schedule = OpenSchedule.objects.filter(
+            road_section=self.road_section,
+            is_active=True
+        ).first()
+        if schedule and schedule.max_capacity > 0:
+            return round(self.current_occupancy / schedule.max_capacity * 100, 1)
+        return 0

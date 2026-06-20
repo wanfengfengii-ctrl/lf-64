@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}{% if mode == 'create' %}登记临时管制{% else %}编辑临时管制{% endif %} - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:temporary_control_list' %}">临时管制</a></li>
+        <li class="breadcrumb-item active">{% if mode == 'create' %}登记管制{% else %}编辑管制{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">{% if mode == 'create' %}🚧 登记临时管制{% else %}✏️ 编辑临时管制{% endif %}</h4>
+            <a href="{% url 'roads:temporary_control_list' %}" class="btn btn-outline-secondary">← 返回列表</a>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">{% if mode == 'create' %}管制信息填写{% else %}修改管制信息{% endif %}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.road_section.label }} <span class="text-danger">*</span></label>
+                            {{ form.road_section }}
+                            {% if form.road_section.errors %}<div class="text-danger small">{{ form.road_section.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.control_type.label }} <span class="text-danger">*</span></label>
+                            {{ form.control_type }}
+                            {% if form.control_type.errors %}<div class="text-danger small">{{ form.control_type.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.open_status.label }} <span class="text-danger">*</span></label>
+                            {{ form.open_status }}
+                            {% if form.open_status.errors %}<div class="text-danger small">{{ form.open_status.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.adjusted_capacity.label }}</label>
+                            {{ form.adjusted_capacity }}
+                            <div class="form-text">受管制影响后的调整容量</div>
+                            {% if form.adjusted_capacity.errors %}<div class="text-danger small">{{ form.adjusted_capacity.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.reason.label }} <span class="text-danger">*</span></label>
+                        {{ form.reason }}
+                        {% if form.reason.errors %}<div class="text-danger small">{{ form.reason.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.start_time.label }} <span class="text-danger">*</span></label>
+                            {{ form.start_time }}
+                            {% if form.start_time.errors %}<div class="text-danger small">{{ form.start_time.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.end_time.label }}</label>
+                            {{ form.end_time }}
+                            <div class="form-text">留空表示持续至手动解除</div>
+                            {% if form.end_time.errors %}<div class="text-danger small">{{ form.end_time.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.adjusted_open_time.label }}</label>
+                            {{ form.adjusted_open_time }}
+                            <div class="form-text">管制期间的调整开放时间</div>
+                            {% if form.adjusted_open_time.errors %}<div class="text-danger small">{{ form.adjusted_open_time.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.adjusted_close_time.label }}</label>
+                            {{ form.adjusted_close_time }}
+                            <div class="form-text">管制期间的调整关闭时间</div>
+                            {% if form.adjusted_close_time.errors %}<div class="text-danger small">{{ form.adjusted_close_time.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.notice_public.label }}</label>
+                        {{ form.notice_public }}
+                        <div class="form-text">对外发布的公告内容</div>
+                        {% if form.notice_public.errors %}<div class="text-danger small">{{ form.notice_public.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.issued_by.label }} <span class="text-danger">*</span></label>
+                            {{ form.issued_by }}
+                            {% if form.issued_by.errors %}<div class="text-danger small">{{ form.issued_by.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.is_active.label }}</label>
+                            {{ form.is_active }}
+                            {% if form.is_active.errors %}<div class="text-danger small">{{ form.is_active.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'roads:temporary_control_list' %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if mode == 'create' %}提交登记{% else %}保存修改{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

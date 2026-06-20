@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}临时管制 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">🚧 临时管制</h3>
+    <div>
+        <a href="{% url 'roads:temporary_control_create' %}" class="btn btn-primary">+ 登记管制</a>
+        <a href="{% url 'roads:open_status_dashboard' %}" class="btn btn-outline-info ms-2">开放状态看板</a>
+    </div>
+</div>
+
+<div class="quick-stats-grid">
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#6c757d;">{{ stats.total }}</div>
+        <div class="quick-stat-label">管制总数</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#dc3545;">{{ stats.active }}</div>
+        <div class="quick-stat-label">🔴 生效中</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#28a745;">{{ stats.inactive }}</div>
+        <div class="quick-stat-label">🟢 已解除</div>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">所属路段</label>
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for road in roads %}
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"%s" %}selected{% endif %}>{{ road.code }} - {{ road.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">管制类型</label>
+            <select name="type" class="form-select">
+                <option value="">全部类型</option>
+                {% for val, label in control_type_choices.items %}
+                <option value="{{ val }}" {% if type_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">状态</label>
+            <select name="status" class="form-select">
+                <option value="">全部</option>
+                <option value="active" {% if status_filter == "active" %}selected{% endif %}>生效中</option>
+                <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>已解除</option>
+            </select>
+        </div>
+        <div class="col-md-4 text-end">
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{% url 'roads:temporary_control_list' %}" class="btn btn-outline-secondary">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>路段</th>
+                    <th>管制类型</th>
+                    <th>开放状态</th>
+                    <th>原因</th>
+                    <th>开始时间</th>
+                    <th>结束时间</th>
+                    <th>调整容量</th>
+                    <th>状态</th>
+                    <th>发布人</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ctrl in controls %}
+                <tr {% if ctrl.is_active %}class="table-warning"{% endif %}>
+                    <td>
+                        <a href="{% url 'roads:road_detail' ctrl.road_section.pk %}">
+                            {{ ctrl.road_section.code }}
+                        </a>
+                    </td>
+                    <td>{{ control_type_choices|get_item:ctrl.control_type }}</td>
+                    <td>
+                        <span class="badge badge-passage-{{ ctrl.open_status }}">
+                            {{ open_status_choices|get_item:ctrl.open_status }}
+                        </span>
+                    </td>
+                    <td style="max-width: 200px;" title="{{ ctrl.reason }}">
+                        {% if ctrl.reason|length > 30 %}{{ ctrl.reason|slice:":30" }}...{% else %}{{ ctrl.reason }}{% endif %}
+                    </td>
+                    <td>{{ ctrl.start_time|date:"Y-m-d H:i" }}</td>
+                    <td>{{ ctrl.end_time|date:"Y-m-d H:i" }}</td>
+                    <td>{{ ctrl.adjusted_capacity|default:"-" }}</td>
+                    <td>
+                        {% if ctrl.is_active %}
+                        <span class="badge bg-danger">生效中</span>
+                        {% else %}
+                        <span class="badge bg-secondary">已解除</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ ctrl.issued_by }}</td>
+                    <td>
+                        <a href="{% url 'roads:temporary_control_edit' ctrl.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        {% if ctrl.is_active %}
+                        <form method="post" action="{% url 'roads:temporary_control_deactivate' ctrl.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('确定要解除该管制吗？')">解除</button>
+                        </form>
+                        {% endif %}
+                        <a href="{% url 'roads:temporary_control_delete' ctrl.pk %}" class="btn btn-sm btn-outline-danger">删除</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="10" class="text-center text-muted">暂无临时管制记录</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -958,6 +958,8 @@ body {
     animation: pulse-ring 1.5s infinite;
 }
 
+.bg-orange { background-color: #fd7e14 !important; }
+
 .status-banner {
     padding: 16px 20px;
     border-radius: 8px;
@@ -973,6 +975,8 @@ body {
 .status-banner.restricted { background: linear-gradient(135deg, #ffe5d0, #ffd0a0); border-left: 4px solid #fd7e14; }
 .status-banner.detour { background: linear-gradient(135deg, #e2d9f3, #d1c4e9); border-left: 4px solid #6f42c1; }
 .status-banner.closed { background: linear-gradient(135deg, #f8d7da, #f5c6cb); border-left: 4px solid #dc3545; }
+.status-banner.open { background: linear-gradient(135deg, #d4edda, #c3e6cb); border-left: 4px solid #28a745; }
+.status-banner.partial { background: linear-gradient(135deg, #fff3cd, #ffeeba); border-left: 4px solid #ffc107; }
 
 .modal-action-form {
     padding: 20px;

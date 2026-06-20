@@ -2,12 +2,15 @@ from django import forms
 from .models import (
     RoadSection, Point, InspectionRecord, Photo, Alert, TaskOrder,
     Hazard, HazardDisposal, RoadPassageStatus,
+    OpenSchedule, TemporaryControl, VisitorFlowRecord,
     WEAR_LEVEL_CHOICES, POINT_TYPE_CHOICES, ROAD_STATUS_CHOICES,
     ALERT_LEVEL_CHOICES, ALERT_TYPE_CHOICES, TASK_STATUS_CHOICES,
     HAZARD_LOCATION_TYPE_CHOICES, HAZARD_TYPE_CHOICES,
     HAZARD_LEVEL_CHOICES, HAZARD_STATUS_CHOICES,
     CONTROL_SUGGESTION_CHOICES, PASSAGE_STATUS_CHOICES,
     DISPOSAL_TYPE_CHOICES,
+    SEASON_CHOICES, WEATHER_CONDITION_CHOICES, CONTROL_TYPE_CHOICES,
+    FLOW_RECORD_TYPE_CHOICES, OPEN_STATUS_CHOICES, MAINTENANCE_STATUS_CHOICES,
 )
 
 
@@ -312,4 +315,79 @@ class RoadPassageStatusForm(forms.ModelForm):
             'updated_by': forms.TextInput(attrs={'class': 'form-control'}),
             'estimated_resume': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'notice_public': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class OpenScheduleForm(forms.ModelForm):
+    class Meta:
+        model = OpenSchedule
+        fields = [
+            'road_section', 'season', 'weather_condition', 'maintenance_status',
+            'open_time', 'close_time', 'max_capacity',
+            'time_slot_minutes', 'slot_max_capacity',
+            'is_active', 'description'
+        ]
+        widgets = {
+            'road_section': forms.Select(attrs={'class': 'form-control'}),
+            'season': forms.Select(attrs={'class': 'form-control'}),
+            'weather_condition': forms.Select(attrs={'class': 'form-control'}),
+            'maintenance_status': forms.Select(attrs={'class': 'form-control'}),
+            'open_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'close_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'max_capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'time_slot_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 15, 'step': 15}),
+            'slot_max_capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class TemporaryControlForm(forms.ModelForm):
+    class Meta:
+        model = TemporaryControl
+        fields = [
+            'road_section', 'control_type', 'open_status', 'reason',
+            'start_time', 'end_time', 'adjusted_capacity',
+            'adjusted_open_time', 'adjusted_close_time',
+            'is_active', 'issued_by', 'notice_public'
+        ]
+        widgets = {
+            'road_section': forms.Select(attrs={'class': 'form-control'}),
+            'control_type': forms.Select(attrs={'class': 'form-control'}),
+            'open_status': forms.Select(attrs={'class': 'form-control'}),
+            'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'start_time': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'end_time': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'adjusted_capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'adjusted_open_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'adjusted_close_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'issued_by': forms.TextInput(attrs={'class': 'form-control'}),
+            'notice_public': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['adjusted_capacity'].required = False
+        self.fields['adjusted_open_time'].required = False
+        self.fields['adjusted_close_time'].required = False
+
+
+class VisitorFlowRecordForm(forms.ModelForm):
+    class Meta:
+        model = VisitorFlowRecord
+        fields = [
+            'road_section', 'record_date', 'record_time', 'record_type',
+            'visitor_count', 'current_occupancy', 'weather', 'notes', 'recorded_by'
+        ]
+        widgets = {
+            'road_section': forms.Select(attrs={'class': 'form-control'}),
+            'record_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'record_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'record_type': forms.Select(attrs={'class': 'form-control'}),
+            'visitor_count': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'current_occupancy': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'weather': forms.Select(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'recorded_by': forms.TextInput(attrs={'class': 'form-control'}),
         }
