@@ -1,8 +1,13 @@
 from django import forms
 from .models import (
     RoadSection, Point, InspectionRecord, Photo, Alert, TaskOrder,
+    Hazard, HazardDisposal, RoadPassageStatus,
     WEAR_LEVEL_CHOICES, POINT_TYPE_CHOICES, ROAD_STATUS_CHOICES,
     ALERT_LEVEL_CHOICES, ALERT_TYPE_CHOICES, TASK_STATUS_CHOICES,
+    HAZARD_LOCATION_TYPE_CHOICES, HAZARD_TYPE_CHOICES,
+    HAZARD_LEVEL_CHOICES, HAZARD_STATUS_CHOICES,
+    CONTROL_SUGGESTION_CHOICES, PASSAGE_STATUS_CHOICES,
+    DISPOSAL_TYPE_CHOICES,
 )
 
 
@@ -189,3 +194,121 @@ class DataExportForm(forms.Form):
         required=False,
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
+
+
+class HazardForm(forms.ModelForm):
+    class Meta:
+        model = Hazard
+        fields = [
+            'road_section', 'point', 'title', 'location_type', 'hazard_type',
+            'hazard_level', 'description', 'latitude', 'longitude',
+            'location_desc', 'reported_by', 'reported_date',
+            'inspection_source', 'control_suggestion', 'passage_status',
+            'affected_length_m', 'casualty_info'
+        ]
+        widgets = {
+            'road_section': forms.Select(attrs={'class': 'form-control'}),
+            'point': forms.Select(attrs={'class': 'form-control'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'location_type': forms.Select(attrs={'class': 'form-control'}),
+            'hazard_type': forms.Select(attrs={'class': 'form-control'}),
+            'hazard_level': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'latitude': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.000001'}),
+            'longitude': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.000001'}),
+            'location_desc': forms.TextInput(attrs={'class': 'form-control'}),
+            'reported_by': forms.TextInput(attrs={'class': 'form-control'}),
+            'reported_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'inspection_source': forms.Select(attrs={'class': 'form-control'}),
+            'control_suggestion': forms.Select(attrs={'class': 'form-control'}),
+            'passage_status': forms.Select(attrs={'class': 'form-control'}),
+            'affected_length_m': forms.NumberInput(attrs={'class': 'form-control', 'step': '1'}),
+            'casualty_info': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['road_section'].required = False
+        self.fields['point'].required = False
+        self.fields['inspection_source'].required = False
+        self.fields['latitude'].required = False
+        self.fields['longitude'].required = False
+
+
+class HazardAssessForm(forms.ModelForm):
+    class Meta:
+        model = Hazard
+        fields = [
+            'hazard_level', 'status', 'control_suggestion', 'passage_status',
+            'assess_note', 'assessed_by', 'disposal_deadline'
+        ]
+        widgets = {
+            'hazard_level': forms.Select(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'control_suggestion': forms.Select(attrs={'class': 'form-control'}),
+            'passage_status': forms.Select(attrs={'class': 'form-control'}),
+            'assess_note': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'assessed_by': forms.TextInput(attrs={'class': 'form-control'}),
+            'disposal_deadline': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+
+
+class HazardStatusForm(forms.ModelForm):
+    class Meta:
+        model = Hazard
+        fields = ['status', 'hazard_level', 'passage_status', 'closed_by']
+        widgets = {
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'hazard_level': forms.Select(attrs={'class': 'form-control'}),
+            'passage_status': forms.Select(attrs={'class': 'form-control'}),
+            'closed_by': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class HazardDisposalForm(forms.ModelForm):
+    class Meta:
+        model = HazardDisposal
+        fields = [
+            'disposal_type', 'description', 'disposed_by', 'disposed_at',
+            'disposal_result', 'next_step', 'related_task',
+            'status_after', 'level_after', 'passage_after'
+        ]
+        widgets = {
+            'disposal_type': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'disposed_by': forms.TextInput(attrs={'class': 'form-control'}),
+            'disposed_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'disposal_result': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'next_step': forms.TextInput(attrs={'class': 'form-control'}),
+            'related_task': forms.Select(attrs={'class': 'form-control'}),
+            'status_after': forms.Select(attrs={'class': 'form-control'}),
+            'level_after': forms.Select(attrs={'class': 'form-control'}),
+            'passage_after': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['related_task'].required = False
+        self.fields['status_after'].required = False
+        self.fields['level_after'].required = False
+        self.fields['passage_after'].required = False
+        self.fields['disposal_result'].required = False
+        self.fields['next_step'].required = False
+
+
+class RoadPassageStatusForm(forms.ModelForm):
+    class Meta:
+        model = RoadPassageStatus
+        fields = [
+            'passage_status', 'affected_start_km', 'affected_end_km',
+            'status_reason', 'updated_by', 'estimated_resume', 'notice_public'
+        ]
+        widgets = {
+            'passage_status': forms.Select(attrs={'class': 'form-control'}),
+            'affected_start_km': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'affected_end_km': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'status_reason': forms.TextInput(attrs={'class': 'form-control'}),
+            'updated_by': forms.TextInput(attrs={'class': 'form-control'}),
+            'estimated_resume': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'notice_public': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }

@@ -1,0 +1,465 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}预警地图 - 古驿道灾害隐患与通行安全预警{% endblock %}
+
+{% block map_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+#hazard-map {
+    height: 700px;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+.hazard-popup {
+    min-width: 280px;
+    max-width: 320px;
+}
+.hazard-popup h6 {
+    color: #5c4033;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+.hazard-level-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+.hazard-popup-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px dashed #eee;
+}
+.hazard-popup-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+.progress-mini {
+    height: 6px;
+    border-radius: 3px;
+    background: #e9ecef;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.progress-mini-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+    border-radius: 3px;
+}
+.road-status-panel {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.road-status-item {
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    border-left: 4px solid #ccc;
+    background: #fff;
+    font-size: 13px;
+}
+.road-status-item.normal { border-left-color: #28a745; background: #f0fff4; }
+.road-status-item.caution { border-left-color: #ffc107; background: #fffde7; }
+.road-status-item.restricted { border-left-color: #fd7e14; background: #fff8f0; }
+.road-status-item.detour { border-left-color: #6f42c1; background: #f8f4ff; }
+.road-status-item.closed { border-left-color: #dc3545; background: #fff5f5; }
+.hazard-count-badge {
+    display: inline-block;
+    min-width: 24px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #dc3545;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+.map-filter-bar {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    border: 1px solid #dee2e6;
+}
+.legend-dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+    position: relative;
+}
+.legend-dot.pulse::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    opacity: 0.5;
+    animation: pulse-ring 1.5s infinite;
+}
+.hazard-summary-card {
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    color: #fff;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">🗺️ 灾害隐患预警地图</h3>
+    <div>
+        <a href="{% url 'roads:hazard_list' %}" class="btn btn-outline-primary">隐患列表</a>
+        <a href="{% url 'roads:hazard_create' %}" class="btn btn-primary ms-2">+ 上报隐患</a>
+        <a href="{% url 'roads:passage_status_list' %}" class="btn btn-outline-success ms-2">通行状态</a>
+    </div>
+</div>
+
+<div class="map-filter-bar">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">预警等级</label>
+            <select id="filter-level" class="form-select form-select-sm">
+                <option value="">全部等级</option>
+                {% for k, v in hazard_level_choices.items %}
+                {% if k != 'safe' %}
+                <option value="{{ k }}" {% if level_filter == k %}selected{% endif %}>{{ v }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">处置状态</label>
+            <select id="filter-status" class="form-select form-select-sm">
+                <option value="">全部状态</option>
+                {% for k, v in hazard_status_choices.items %}
+                {% if k not in 'resolved,closed' %}
+                <option value="{{ k }}" {% if status_filter == k %}selected{% endif %}>{{ v }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">路段</label>
+            <select id="filter-road" class="form-select form-select-sm">
+                <option value="">全部路段</option>
+                {% for road in roads %}
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"s" %}selected{% endif %}>{{ road.code }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button id="apply-filter" class="btn btn-sm btn-primary">应用筛选</button>
+            <button id="reset-filter" class="btn btn-sm btn-outline-secondary">重置</button>
+            <button id="refresh-data" class="btn btn-sm btn-outline-info">🔄 刷新数据</button>
+        </div>
+        <div class="col-md-3 text-end">
+            <small class="text-muted">最后更新：<span id="last-update">--</span></small>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-9">
+        <div id="hazard-map"></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card mb-3">
+            <div class="card-header">📊 隐患统计</div>
+            <div class="card-body" id="hazard-summary">
+                <div class="text-muted text-center small py-2">加载中...</div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">🏷️ 图例</div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <span class="legend-dot" style="background:#17a2b8;"></span>
+                    <small>提示级隐患</small>
+                </div>
+                <div class="mb-2">
+                    <span class="legend-dot" style="background:#ffc107;"></span>
+                    <small>警告级隐患</small>
+                </div>
+                <div class="mb-2">
+                    <span class="legend-dot" style="background:#fd7e14;"></span>
+                    <small>严重级隐患</small>
+                </div>
+                <div class="mb-2">
+                    <span class="legend-dot pulse" style="background:#dc3545;color:#dc3545;"></span>
+                    <small>紧急级隐患（脉冲）</small>
+                </div>
+                <div class="mb-2">
+                    <span class="legend-dot" style="background:#6c757d;"></span>
+                    <small>无坐标隐患</small>
+                </div>
+                <hr class="my-2">
+                <div class="mb-1 small text-muted">
+                    <div class="mb-1">🚦 通行状态图例：</div>
+                    <div><span style="display:inline-block;width:10px;height:10px;background:#28a745;border-radius:2px;"></span> 正常</div>
+                    <div><span style="display:inline-block;width:10px;height:10px;background:#ffc107;border-radius:2px;"></span> 谨慎</div>
+                    <div><span style="display:inline-block;width:10px;height:10px;background:#fd7e14;border-radius:2px;"></span> 限制</div>
+                    <div><span style="display:inline-block;width:10px;height:10px;background:#6f42c1;border-radius:2px;"></span> 绕行</div>
+                    <div><span style="display:inline-block;width:10px;height:10px;background:#dc3545;border-radius:2px;"></span> 封闭</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>🛣️ 路段通行状态</span>
+                    <small class="text-muted" id="road-count">加载中</small>
+                </div>
+            </div>
+            <div class="card-body p-2">
+                <div class="road-status-panel" id="road-status-panel">
+                    <div class="text-muted text-center small py-3">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const map = L.map('hazard-map').setView([30.0, 110.0], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    const allMarkers = [];
+    const allHazards = [];
+    let roadPassageData = [];
+
+    function loadHazards() {
+        const level = document.getElementById('filter-level').value;
+        const status = document.getElementById('filter-status').value;
+        const road = document.getElementById('filter-road').value;
+
+        const params = new URLSearchParams();
+        if (level) params.append('level', level);
+        if (status) params.append('status', status);
+        if (road) params.append('road', road);
+
+        const url = "{% url 'roads:api_hazards_geo' %}" + (params.toString() ? '?' + params.toString() : '');
+
+        allMarkers.forEach(m => map.removeLayer(m));
+        allMarkers.length = 0;
+        allHazards.length = 0;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                data.features.forEach(f => {
+                    const p = f.properties;
+                    allHazards.push(p);
+                    const [lon, lat] = f.geometry.coordinates;
+                    const color = p.hazard_level_color;
+                    const isHigh = p.is_high_risk;
+
+                    let marker;
+                    if (isHigh) {
+                        const pulseIcon = L.divIcon({
+                            className: '',
+                            html: `<div style="position:relative;width:30px;height:30px;">
+                                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${p.hazard_level === 'critical' ? '20' : '16'}px;height:${p.hazard_level === 'critical' ? '20' : '16'}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.3);z-index:2;"></div>
+                                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:${color}55;animation:pulse-ring 1.6s cubic-bezier(0.215,0.61,0.355,1) infinite;"></div>
+                            </div>`,
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15]
+                        });
+                        marker = L.marker([lat, lon], { icon: pulseIcon });
+                    } else {
+                        marker = L.circleMarker([lat, lon], {
+                            radius: isHigh ? 10 : 7,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        });
+                    }
+
+                    marker.bindPopup(buildPopup(p), { className: 'hazard-popup', maxWidth: 340 });
+                    marker.addTo(map);
+                    allMarkers.push(marker);
+                });
+
+                if (allMarkers.length > 0) {
+                    const group = L.featureGroup(allMarkers);
+                    map.fitBounds(group.getBounds().pad(0.15));
+                }
+
+                updateSummary();
+                document.getElementById('last-update').textContent = new Date().toLocaleString('zh-CN');
+            });
+    }
+
+    function buildPopup(p) {
+        return `
+            <h6>
+                <span class="badge badge-hazard-${p.hazard_level}">${p.hazard_level_display}</span>
+                <span class="ms-1" style="font-size:12px;">${p.code}</span>
+            </h6>
+            <div style="font-weight:600;margin-bottom:10px;color:#333;">${p.title}</div>
+            <div class="hazard-level-bar" style="background:${p.hazard_level_color}18;border:1px solid ${p.hazard_level_color}33;">
+                <div>
+                    <div style="font-size:11px;color:#666;">通行状态</div>
+                    <div style="font-size:14px;font-weight:600;color:${p.passage_color};">${p.passage_display}</div>
+                </div>
+                <div style="flex:1;margin-left:12px;">
+                    <div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
+                        <span>处置进度</span>
+                        <span style="font-weight:600;">${p.progress}%</span>
+                    </div>
+                    <div class="progress-mini">
+                        <div class="progress-mini-fill" style="width:${p.progress}%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="hazard-popup-row">
+                <span class="hazard-popup-label">位置类型</span>
+                <span>${p.location_type_display}</span>
+            </div>
+            <div class="hazard-popup-row">
+                <span class="hazard-popup-label">隐患类型</span>
+                <span>${p.hazard_type_display}</span>
+            </div>
+            <div class="hazard-popup-row">
+                <span class="hazard-popup-label">所属路段</span>
+                <span>${p.road_section || '未指定'}</span>
+            </div>
+            <div class="hazard-popup-row">
+                <span class="hazard-popup-label">封控建议</span>
+                <span>${p.control_suggestion}</span>
+            </div>
+            <div class="hazard-popup-row">
+                <span class="hazard-popup-label">处置状态</span>
+                <span class="badge badge-hazard-${p.status}">${p.status_display}</span>
+            </div>
+            <div class="hazard-popup-row">
+                <span class="hazard-popup-label">上报时间</span>
+                <span style="font-size:12px;">${p.reported_at}</span>
+            </div>
+            ${p.description ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #eee;">
+                <div style="font-size:11px;color:#666;margin-bottom:3px;">隐患描述</div>
+                <div style="font-size:12px;color:#555;">${p.description}</div>
+            </div>` : ''}
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;display:flex;flex-direction:column;gap:5px;">
+                <a href="{% url 'roads:hazard_list' %}${p.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
+                <a href="{% url 'roads:hazard_list' %}${p.id}/dispose/" class="btn btn-sm btn-outline-warning w-100">进行处置</a>
+            </div>
+        `;
+    }
+
+    function updateSummary() {
+        const counts = { critical: 0, severe: 0, warning: 0, info: 0 };
+        allHazards.forEach(h => {
+            if (counts[h.hazard_level] !== undefined) counts[h.hazard_level]++;
+        });
+        const total = allHazards.length;
+        const high = counts.critical + counts.severe;
+
+        document.getElementById('hazard-summary').innerHTML = `
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <div class="hazard-summary-card" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                        <div style="font-size:1.5rem;">${total}</div>
+                        <div style="font-size:11px;opacity:0.9;">活跃隐患</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="hazard-summary-card" style="background:linear-gradient(135deg,#f093fb,#f5576c);">
+                        <div style="font-size:1.5rem;">${high}</div>
+                        <div style="font-size:11px;opacity:0.9;">高风险</div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-1 mb-0">
+                <span class="badge badge-hazard-critical" style="flex:1;text-align:center;">紧急 ${counts.critical}</span>
+                <span class="badge badge-hazard-severe" style="flex:1;text-align:center;">严重 ${counts.severe}</span>
+                <span class="badge badge-hazard-warning" style="flex:1;text-align:center;">警告 ${counts.warning}</span>
+                <span class="badge badge-hazard-info" style="flex:1;text-align:center;">提示 ${counts.info}</span>
+            </div>
+        `;
+    }
+
+    function loadRoadPassageStatus() {
+        fetch("{% url 'roads:api_roads_passage_status' %}")
+            .then(r => r.json())
+            .then(data => {
+                roadPassageData = data.roads;
+                document.getElementById('road-count').textContent = `共${roadPassageData.length}条`;
+
+                const panel = document.getElementById('road-status-panel');
+                const sorted = [...roadPassageData].sort((a, b) => {
+                    const order = { closed: 0, detour: 1, restricted: 2, caution: 3, normal: 4 };
+                    return (order[a.passage_status] || 9) - (order[b.passage_status] || 9);
+                });
+
+                if (sorted.length === 0) {
+                    panel.innerHTML = '<div class="text-muted text-center small py-3">暂无数据</div>';
+                    return;
+                }
+
+                panel.innerHTML = sorted.map(r => `
+                    <div class="road-status-item ${r.passage_status}">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong style="font-size:12px;">${r.road_code}</strong>
+                            <span class="badge badge-passage-${r.passage_status}" style="font-size:11px;">${r.passage_display}</span>
+                        </div>
+                        <div style="font-size:11px;color:#666;margin-bottom:4px;">${r.road_name}</div>
+                        ${r.status_reason ? `<div style="font-size:11px;color:#888;">📋 ${r.status_reason}</div>` : ''}
+                        ${r.active_hazard_count > 0 ? `<div class="mt-1">
+                            <span class="hazard-count-badge">${r.active_hazard_count}</span>
+                            <small class="text-muted ms-1">处活跃隐患</small>
+                            ${r.critical_hazard_count > 0 ? `<span class="hazard-count-badge ms-1" style="background:#dc3545;">${r.critical_hazard_count}紧急</span>` : ''}
+                        </div>` : '<div class="text-success small mt-1">✓ 无活跃隐患</div>'}
+                    </div>
+                `).join('');
+            });
+    }
+
+    document.getElementById('apply-filter').addEventListener('click', loadHazards);
+    document.getElementById('reset-filter').addEventListener('click', () => {
+        document.getElementById('filter-level').value = '';
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-road').value = '';
+        loadHazards();
+    });
+    document.getElementById('refresh-data').addEventListener('click', () => {
+        loadHazards();
+        loadRoadPassageStatus();
+    });
+
+    loadHazards();
+    loadRoadPassageStatus();
+
+    setInterval(() => {
+        loadRoadPassageStatus();
+    }, 60000);
+});
+</script>
+{% endblock %}

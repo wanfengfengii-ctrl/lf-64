@@ -49,8 +49,26 @@ urlpatterns = [
     path('photos/<int:pk>/', views.photo_detail, name='photo_detail'),
     path('photos/<int:pk>/delete/', views.photo_delete, name='photo_delete'),
 
+    path('hazards/', views.hazard_list, name='hazard_list'),
+    path('hazards/create/', views.hazard_create, name='hazard_create'),
+    path('hazards/<int:pk>/', views.hazard_detail, name='hazard_detail'),
+    path('hazards/<int:pk>/edit/', views.hazard_edit, name='hazard_edit'),
+    path('hazards/<int:pk>/delete/', views.hazard_delete, name='hazard_delete'),
+    path('hazards/<int:pk>/assess/', views.hazard_assess, name='hazard_assess'),
+    path('hazards/<int:pk>/dispose/', views.hazard_dispose, name='hazard_dispose'),
+    path('hazards/<int:pk>/close/', views.hazard_close, name='hazard_close'),
+    path('hazards/<int:pk>/status/', views.hazard_update_status, name='hazard_update_status'),
+    path('hazard-map/', views.hazard_map, name='hazard_map'),
+
+    path('passage-status/', views.passage_status_list, name='passage_status_list'),
+    path('passage-status/<int:pk>/edit/', views.passage_status_edit, name='passage_status_edit'),
+    path('passage-status/<int:pk>/recalc/', views.passage_status_recalc, name='passage_status_recalc'),
+
     path('api/wear-data/', views.api_wear_data, name='api_wear_data'),
     path('api/points-geo/', views.api_points_geo, name='api_points_geo'),
     path('api/points-geo-timeline/', views.api_points_geo_timeline, name='api_points_geo_timeline'),
     path('api/point/<int:point_pk>/wear-history/', views.api_point_wear_history, name='api_point_wear_history'),
+    path('api/hazards-geo/', views.api_hazards_geo, name='api_hazards_geo'),
+    path('api/roads-passage-status/', views.api_roads_passage_status, name='api_roads_passage_status'),
+    path('api/hazard-summary/', views.api_hazard_summary, name='api_hazard_summary'),
 ]

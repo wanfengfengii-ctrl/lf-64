@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}隐患处置 - {{ hazard.code }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_list' %}">隐患管理</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_detail' hazard.pk %}">{{ hazard.code }}</a></li>
+        <li class="breadcrumb-item active">处置操作</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🔧 添加处置记录 - {{ hazard.code }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4 p-3 bg-light rounded">
+                    <div class="col-md-6">
+                        <div class="mb-2"><strong>{{ hazard.title }}</strong></div>
+                        <div class="small">
+                            <span class="badge badge-hazard-{{ hazard.hazard_level }}">
+                                {{ hazard.get_hazard_level_display }}
+                            </span>
+                            <span class="badge badge-hazard-{{ hazard.status }} ms-1">
+                                {{ hazard.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end small text-muted">
+                        <div>{{ hazard.get_location_type_display }} · {{ hazard.get_hazard_type_display }}</div>
+                        <div>上报人：{{ hazard.reported_by }} · {{ hazard.reported_date }}</div>
+                        {% if hazard.disposal_deadline %}
+                        <div>处置期限：<span class="{% if hazard.is_overdue %}text-danger fw-semibold{% endif %}">{{ hazard.disposal_deadline }}</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">处置类型 <span class="text-danger">*</span></label>
+                            {{ form.disposal_type }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">处置人员 <span class="text-danger">*</span></label>
+                            {{ form.disposed_by }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">处置时间</label>
+                        {{ form.disposed_at }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">处置说明 <span class="text-danger">*</span></label>
+                        {{ form.description }}
+                        <div class="form-text">描述本次处置的具体操作、措施、使用的材料设备等</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">处置结果</label>
+                        {{ form.disposal_result }}
+                        <div class="form-text">本次处置取得的效果、遗留问题等</div>
+                    </div>
+
+                    <hr class="my-4">
+                    <h6 class="text-muted mb-3">状态更新（可选，留空则不更新）</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">处置后状态</label>
+                            {{ form.status_after }}
+                            <div class="form-text">处置后隐患流转到哪个阶段</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">处置后等级</label>
+                            {{ form.level_after }}
+                            <div class="form-text">如情况变化可更新等级</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">处置后通行</label>
+                            {{ form.passage_after }}
+                            <div class="form-text">更新该位置通行状态</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8">
+                            <label class="form-label">下一步措施</label>
+                            {{ form.next_step }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">关联工单</label>
+                            {{ form.related_task }}
+                            <div class="form-text">可选：关联整改工单</div>
+                        </div>
+                    </div>
+
+                    {% if form.errors %}
+                    <div class="alert alert-danger mb-4">
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                            <div><strong>{{ field.label }}:</strong> {{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'roads:hazard_detail' hazard.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">保存处置记录</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">📌 当前状态</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">预警等级</div>
+                    <span class="badge badge-hazard-{{ hazard.hazard_level }}" style="font-size:0.85rem;">
+                        {{ hazard.get_hazard_level_display }}
+                    </span>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">处置状态</div>
+                    <span class="badge badge-hazard-{{ hazard.status }}" style="font-size:0.85rem;">
+                        {{ hazard.get_status_display }}
+                    </span>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">通行状态</div>
+                    <span class="badge badge-passage-{{ hazard.passage_status }}" style="font-size:0.85rem;">
+                        {{ hazard.get_passage_status_display }}
+                    </span>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">封控建议</div>
+                    <span class="badge badge-control-{{ hazard.control_suggestion }}" style="font-size:0.85rem;">
+                        {{ hazard.get_control_suggestion_display }}
+                    </span>
+                </div>
+                <div>
+                    <div class="small text-muted mb-1">处置进度</div>
+                    <div class="hazard-progress-bar">
+                        <div class="hazard-progress-fill" style="width:{{ hazard.get_progress_percentage }}%;"></div>
+                    </div>
+                    <div class="text-end small mt-1">{{ hazard.get_progress_percentage }}%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">💡 处置类型说明</div>
+            <div class="card-body small">
+                <div class="mb-2"><strong>现场处置：</strong>现场应急处理，如清理塌方体、排水等</div>
+                <div class="mb-2"><strong>加固维修：</strong>对结构进行加固、修复作业</div>
+                <div class="mb-2"><strong>清理疏通：</strong>排水沟、落石区清理疏通</div>
+                <div class="mb-2"><strong>设置监控：</strong>设置监测点或警示标识</div>
+                <div class="mb-2"><strong>封控警戒：</strong>设置围栏、警戒线等封控措施</div>
+                <div class="mb-2"><strong>复核验收：</strong>处置完成后的检查验收</div>
+                <div><strong>派发任务：</strong>派发整改工单给养护队伍</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}{% if mode == 'create' %}上报隐患{% else %}编辑隐患{% endif %} - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_list' %}">隐患管理</a></li>
+        <li class="breadcrumb-item active">{% if mode == 'create' %}上报隐患{% else %}编辑隐患 {{ hazard.code }}{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">{% if mode == 'create' %}📝 隐患信息上报{% else %}✏️ 编辑隐患信息{% endif %}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.title.label }} <span class="text-danger">*</span></label>
+                            {{ form.title }}
+                            {% if form.title.errors %}<div class="text-danger small">{{ form.title.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.location_type.label }} <span class="text-danger">*</span></label>
+                            {{ form.location_type }}
+                            {% if form.location_type.errors %}<div class="text-danger small">{{ form.location_type.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.hazard_type.label }} <span class="text-danger">*</span></label>
+                            {{ form.hazard_type }}
+                            {% if form.hazard_type.errors %}<div class="text-danger small">{{ form.hazard_type.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.road_section.label }}</label>
+                            {{ form.road_section }}
+                            <div class="form-text">选择隐患所在的路段</div>
+                            {% if form.road_section.errors %}<div class="text-danger small">{{ form.road_section.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.point.label }}</label>
+                            {{ form.point }}
+                            <div class="form-text">可选：关联具体点位，将自动填充经纬度</div>
+                            {% if form.point.errors %}<div class="text-danger small">{{ form.point.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.latitude.label }}</label>
+                            {{ form.latitude }}
+                            {% if form.latitude.errors %}<div class="text-danger small">{{ form.latitude.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.longitude.label }}</label>
+                            {{ form.longitude }}
+                            {% if form.longitude.errors %}<div class="text-danger small">{{ form.longitude.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.location_desc.label }}</label>
+                            {{ form.location_desc }}
+                            <div class="form-text">例如：XX路段K3+200米处北侧边坡</div>
+                            {% if form.location_desc.errors %}<div class="text-danger small">{{ form.location_desc.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        <div class="form-text">详细描述隐患的具体情况、规模、对通行的影响等</div>
+                        {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.hazard_level.label }}</label>
+                            {{ form.hazard_level }}
+                            {% if form.hazard_level.errors %}<div class="text-danger small">{{ form.hazard_level.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.control_suggestion.label }}</label>
+                            {{ form.control_suggestion }}
+                            {% if form.control_suggestion.errors %}<div class="text-danger small">{{ form.control_suggestion.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.passage_status.label }}</label>
+                            {{ form.passage_status }}
+                            {% if form.passage_status.errors %}<div class="text-danger small">{{ form.passage_status.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ form.affected_length_m.label }}</label>
+                            {{ form.affected_length_m }}
+                            <div class="form-text">单位：米</div>
+                            {% if form.affected_length_m.errors %}<div class="text-danger small">{{ form.affected_length_m.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.reported_by.label }} <span class="text-danger">*</span></label>
+                            {{ form.reported_by }}
+                            {% if form.reported_by.errors %}<div class="text-danger small">{{ form.reported_by.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.reported_date.label }}</label>
+                            {{ form.reported_date }}
+                            {% if form.reported_date.errors %}<div class="text-danger small">{{ form.reported_date.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.inspection_source.label }}</label>
+                            {{ form.inspection_source }}
+                            <div class="form-text">可选：关联巡查记录</div>
+                            {% if form.inspection_source.errors %}<div class="text-danger small">{{ form.inspection_source.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">{{ form.casualty_info.label }}</label>
+                        {{ form.casualty_info }}
+                        <div class="form-text">如有人员伤亡请填写，无则留空</div>
+                        {% if form.casualty_info.errors %}<div class="text-danger small">{{ form.casualty_info.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% if hazard %}{% url 'roads:hazard_detail' hazard.pk %}{% else %}{% url 'roads:hazard_list' %}{% endif %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if mode == 'create' %}提交上报{% else %}保存修改{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">📖 填写指南</div>
+            <div class="card-body">
+                <div class="small text-muted">
+                    <p><strong>位置类型：</strong>石阶、边坡、排水沟、桥涵等</p>
+                    <p><strong>隐患类型：</strong>塌方、积水、落石、断裂、湿滑等</p>
+                    <p><strong>预警等级：</strong>
+                        <br>• <span class="badge badge-hazard-info">提示</span> - 需关注
+                        <br>• <span class="badge badge-hazard-warning">警告</span> - 需处理
+                        <br>• <span class="badge badge-hazard-severe">严重</span> - 紧急处置
+                        <br>• <span class="badge badge-hazard-critical">紧急</span> - 立即处置
+                    </p>
+                    <p class="mb-0"><strong>通行状态联动：</strong>隐患状态变化将自动更新所属路段的通行状态</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

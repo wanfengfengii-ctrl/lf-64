@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}灾害隐患管理 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">⚠️ 灾害隐患与通行安全预警管理</h3>
+    <div>
+        <a href="{% url 'roads:hazard_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> 上报隐患
+        </a>
+        <a href="{% url 'roads:hazard_map' %}" class="btn btn-info ms-2">
+            <i class="bi bi-map"></i> 预警地图
+        </a>
+        <a href="{% url 'roads:passage_status_list' %}" class="btn btn-success ms-2">
+            <i class="bi bi-signpost"></i> 通行状态
+        </a>
+    </div>
+</div>
+
+<div class="quick-stats-grid">
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#5c4033;">{{ stats.total }}</div>
+        <div class="quick-stat-label">隐患总数</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#dc3545;">{{ stats.critical }}</div>
+        <div class="quick-stat-label">紧急隐患</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#fd7e14;">{{ stats.severe }}</div>
+        <div class="quick-stat-label">严重隐患</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#ffc107;">{{ stats.warning }}</div>
+        <div class="quick-stat-label">警告隐患</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#17a2b8;">{{ stats.disposing }}</div>
+        <div class="quick-stat-label">处置中</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#28a745;">{{ stats.resolved }}</div>
+        <div class="quick-stat-label">已消除</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#6c757d;">{{ stats.reported }}</div>
+        <div class="quick-stat-label">待评估</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#721c24;">{{ stats.overdue }}</div>
+        <div class="quick-stat-label">超期未处置</div>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3">
+        <div class="col-md-3">
+            <div class="search-bar">
+                <input type="text" name="q" class="form-control" placeholder="搜索编号/标题/位置..." value="{{ keyword }}">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select name="level" class="form-select">
+                <option value="">全部预警等级</option>
+                {% for k, v in hazard_level_choices.items %}
+                <option value="{{ k }}" {% if level_filter == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="status" class="form-select">
+                <option value="">全部处置状态</option>
+                {% for k, v in hazard_status_choices.items %}
+                <option value="{{ k }}" {% if status_filter == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="type" class="form-select">
+                <option value="">全部隐患类型</option>
+                {% for k, v in hazard_type_choices.items %}
+                <option value="{{ k }}" {% if type_filter == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for road in roads %}
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"s" %}selected{% endif %}>{{ road.code }} - {{ road.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1">
+            <div class="form-check mt-2">
+                <input type="checkbox" name="overdue" value="1" id="overdue-check" {% if overdue_filter == '1' %}checked{% endif %} class="form-check-input">
+                <label class="form-check-label" for="overdue-check">仅超期</label>
+            </div>
+        </div>
+        <div class="col-md-12 text-end">
+            <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+            <a href="{% url 'roads:hazard_list' %}" class="btn btn-outline-secondary btn-sm">重置</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>编号</th>
+                        <th>隐患标题</th>
+                        <th>路段/点位</th>
+                        <th>位置/类型</th>
+                        <th>预警等级</th>
+                        <th>处置状态</th>
+                        <th>通行状态</th>
+                        <th>上报人/时间</th>
+                        <th>进度</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hz in hazards %}
+                    <tr class="{% if hz.is_overdue %}table-danger{% elif hz.hazard_level == 'critical' %}table-warning{% endif %}">
+                        <td>
+                            <code style="font-size:11px;">{{ hz.code }}</code>
+                            {% if hz.is_overdue %}
+                            <span class="overdue-badge">超期</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="font-weight:600;">{{ hz.title }}</div>
+                            {% if hz.location_desc %}
+                            <div class="text-muted small">{{ hz.location_desc }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if hz.road_section %}
+                            <div>{{ hz.road_section.name }}</div>
+                            {% endif %}
+                            {% if hz.point %}
+                            <div class="text-muted small">{{ hz.point.code }} · {{ hz.point.name }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-type-{{ hz.location_type }}">{{ location_type_choices|get_item:hz.location_type }}</span>
+                            <div class="mt-1"><small>{{ hazard_type_choices|get_item:hz.hazard_type }}</small></div>
+                        </td>
+                        <td>
+                            <span class="badge badge-hazard-{{ hz.hazard_level }}">
+                                {{ hazard_level_choices|get_item:hz.hazard_level }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-hazard-{{ hz.status }}">
+                                {{ hazard_status_choices|get_item:hz.status }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-passage-{{ hz.passage_status }}">
+                                {{ passage_status_choices|get_item:hz.passage_status }}
+                            </span>
+                        </td>
+                        <td>
+                            <div>{{ hz.reported_by }}</div>
+                            <div class="text-muted small">{{ hz.reported_date|date:"m-d H:i" }}</div>
+                        </td>
+                        <td style="min-width:120px;">
+                            <div class="hazard-progress-bar">
+                                <div class="hazard-progress-fill" style="width:{{ hz.get_progress_percentage }}%;"></div>
+                            </div>
+                            <small class="text-muted">{{ hz.get_progress_percentage }}%</small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'roads:hazard_detail' hz.pk %}" class="btn btn-outline-primary">详情</a>
+                                {% if hz.status in 'reported,assessing' %}
+                                <a href="{% url 'roads:hazard_assess' hz.pk %}" class="btn btn-outline-info">评估</a>
+                                {% endif %}
+                                {% if hz.status not in 'resolved,closed' %}
+                                <a href="{% url 'roads:hazard_dispose' hz.pk %}" class="btn btn-outline-warning">处置</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-5">
+                            <div style="font-size:3rem;opacity:0.3;">🔍</div>
+                            <div>暂无隐患记录</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.filter-bar form');
+    const selects = form.querySelectorAll('select');
+    const checkbox = form.querySelector('#overdue-check');
+    selects.forEach(s => s.addEventListener('change', () => form.submit()));
+    if (checkbox) checkbox.addEventListener('change', () => form.submit());
+});
+</script>
+{% endblock %}

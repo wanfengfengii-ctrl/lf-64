@@ -13,13 +13,20 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from .models import (
     RoadSection, Point, InspectionRecord, Photo, Alert, TaskOrder,
+    Hazard, HazardDisposal, RoadPassageStatus,
     WEAR_LEVEL_CHOICES, POINT_TYPE_CHOICES, ROAD_STATUS_CHOICES,
     ALERT_LEVEL_CHOICES, ALERT_TYPE_CHOICES, TASK_STATUS_CHOICES,
+    HAZARD_LOCATION_TYPE_CHOICES, HAZARD_TYPE_CHOICES,
+    HAZARD_LEVEL_CHOICES, HAZARD_STATUS_CHOICES,
+    CONTROL_SUGGESTION_CHOICES, PASSAGE_STATUS_CHOICES,
+    DISPOSAL_TYPE_CHOICES,
 )
 from .forms import (
     RoadSectionForm, PointForm, InspectionRecordForm,
     PhotoForm, TaskOrderForm, TaskDispatchForm, TaskRectifyForm,
     TaskReviewForm, AlertForm, DataExportForm,
+    HazardForm, HazardAssessForm, HazardStatusForm,
+    HazardDisposalForm, RoadPassageStatusForm,
 )
 
 
@@ -1337,3 +1344,506 @@ def _export_xlsx(headers, rows, filename):
     )
     response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
     return response
+
+
+# ==================== 灾害隐患与通行安全预警模块 ====================
+
+def _sync_road_passage_status(road_section):
+    if not road_section:
+        return
+    ps, created = RoadPassageStatus.objects.get_or_create(
+        road_section=road_section
+    )
+    ps.recalculate_from_hazards()
+
+
+def hazard_list(request):
+    level_filter = request.GET.get('level')
+    type_filter = request.GET.get('type')
+    loc_filter = request.GET.get('loc_type')
+    status_filter = request.GET.get('status')
+    passage_filter = request.GET.get('passage')
+    road_filter = request.GET.get('road')
+    overdue_filter = request.GET.get('overdue')
+    keyword = request.GET.get('q')
+
+    hazards = Hazard.objects.select_related(
+        'road_section', 'point', 'inspection_source'
+    ).prefetch_related('disposals').all()
+
+    if level_filter:
+        hazards = hazards.filter(hazard_level=level_filter)
+    if type_filter:
+        hazards = hazards.filter(hazard_type=type_filter)
+    if loc_filter:
+        hazards = hazards.filter(location_type=loc_filter)
+    if status_filter:
+        hazards = hazards.filter(status=status_filter)
+    if passage_filter:
+        hazards = hazards.filter(passage_status=passage_filter)
+    if road_filter:
+        hazards = hazards.filter(road_section_id=road_filter)
+    if overdue_filter == '1':
+        today = timezone.now().date()
+        hazards = hazards.exclude(
+            status__in=['resolved', 'closed']
+        ).filter(disposal_deadline__lt=today)
+    if keyword:
+        hazards = hazards.filter(
+            Q(title__icontains=keyword) |
+            Q(code__icontains=keyword) |
+            Q(description__icontains=keyword) |
+            Q(location_desc__icontains=keyword)
+        )
+
+    hazards = hazards.order_by('-reported_at')
+    roads = RoadSection.objects.all()
+
+    stats = {
+        'total': hazards.count(),
+        'critical': hazards.filter(hazard_level='critical').count(),
+        'severe': hazards.filter(hazard_level='severe').count(),
+        'warning': hazards.filter(hazard_level='warning').count(),
+        'reported': hazards.filter(status='reported').count(),
+        'disposing': hazards.filter(status='disposing').count(),
+        'resolved': hazards.filter(status__in=['resolved', 'closed']).count(),
+        'overdue': hazards.exclude(
+            status__in=['resolved', 'closed']
+        ).filter(disposal_deadline__lt=timezone.now().date()).count(),
+    }
+
+    return render(request, 'roads/hazard_list.html', {
+        'hazards': hazards,
+        'roads': roads,
+        'level_filter': level_filter,
+        'type_filter': type_filter,
+        'loc_filter': loc_filter,
+        'status_filter': status_filter,
+        'passage_filter': passage_filter,
+        'road_filter': road_filter,
+        'overdue_filter': overdue_filter,
+        'keyword': keyword or '',
+        'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
+        'hazard_type_choices': dict(HAZARD_TYPE_CHOICES),
+        'location_type_choices': dict(HAZARD_LOCATION_TYPE_CHOICES),
+        'hazard_status_choices': dict(HAZARD_STATUS_CHOICES),
+        'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
+        'stats': stats,
+    })
+
+
+def hazard_create(request):
+    if request.method == 'POST':
+        form = HazardForm(request.POST)
+        if form.is_valid():
+            try:
+                hazard = form.save(commit=False)
+                hazard.status = 'reported'
+                hazard.save()
+                _sync_road_passage_status(hazard.road_section)
+                messages.success(request, f'隐患 {hazard.code} 上报成功。')
+                return redirect('roads:hazard_detail', pk=hazard.pk)
+            except ValidationError as e:
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
+    else:
+        form = HazardForm(initial={
+            'reported_date': timezone.now().date(),
+            'reported_by': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else '系统',
+        })
+    return render(request, 'roads/hazard_form.html', {'form': form, 'mode': 'create'})
+
+
+def hazard_detail(request, pk):
+    hazard = get_object_or_404(
+        Hazard.objects.select_related(
+            'road_section', 'point', 'inspection_source'
+        ).prefetch_related('disposals', 'disposals__related_task'),
+        pk=pk
+    )
+    disposals = hazard.disposals.all().order_by('-disposed_at')
+    return render(request, 'roads/hazard_detail.html', {
+        'hazard': hazard,
+        'disposals': disposals,
+        'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
+        'hazard_type_choices': dict(HAZARD_TYPE_CHOICES),
+        'location_type_choices': dict(HAZARD_LOCATION_TYPE_CHOICES),
+        'hazard_status_choices': dict(HAZARD_STATUS_CHOICES),
+        'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
+        'control_choices': dict(CONTROL_SUGGESTION_CHOICES),
+        'disposal_type_choices': dict(DISPOSAL_TYPE_CHOICES),
+    })
+
+
+def hazard_edit(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+    if request.method == 'POST':
+        form = HazardForm(request.POST, instance=hazard)
+        if form.is_valid():
+            try:
+                h = form.save()
+                _sync_road_passage_status(h.road_section)
+                messages.success(request, f'隐患 {hazard.code} 更新成功。')
+                return redirect('roads:hazard_detail', pk=hazard.pk)
+            except ValidationError as e:
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
+    else:
+        form = HazardForm(instance=hazard)
+    return render(request, 'roads/hazard_form.html', {
+        'form': form, 'hazard': hazard, 'mode': 'edit'
+    })
+
+
+def hazard_assess(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+    if hazard.status not in ['reported', 'assessing']:
+        messages.error(request, '当前状态不允许评估。')
+        return redirect('roads:hazard_detail', pk=pk)
+
+    if request.method == 'POST':
+        form = HazardAssessForm(request.POST, instance=hazard)
+        if form.is_valid():
+            h = form.save(commit=False)
+            if not h.assessed_at:
+                h.assessed_at = timezone.now()
+            if h.status == 'reported':
+                h.status = 'pending_disposal'
+            h.save()
+            HazardDisposal.objects.create(
+                hazard=h,
+                disposal_type='assessed',
+                status_before='reported',
+                status_after=h.status,
+                level_before='info',
+                level_after=h.hazard_level,
+                passage_before='normal',
+                passage_after=h.passage_status,
+                description=h.assess_note or '完成隐患等级评估',
+                disposed_by=h.assessed_by or '系统',
+                disposal_result=f'评估等级：{h.get_hazard_level_display()}，封控建议：{h.get_control_suggestion_display()}',
+                next_step='按处置方案开展处置工作'
+            )
+            _sync_road_passage_status(h.road_section)
+            messages.success(request, '隐患评估完成。')
+            return redirect('roads:hazard_detail', pk=pk)
+    else:
+        form = HazardAssessForm(instance=hazard, initial={
+            'status': 'pending_disposal' if hazard.status == 'reported' else hazard.status,
+            'disposal_deadline': hazard.disposal_deadline or (timezone.now().date() + timedelta(days=7)),
+        })
+    return render(request, 'roads/hazard_assess.html', {
+        'form': form, 'hazard': hazard
+    })
+
+
+def hazard_update_status(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+    if request.method == 'POST':
+        form = HazardStatusForm(request.POST, instance=hazard)
+        if form.is_valid():
+            old_status = hazard.status
+            old_level = hazard.hazard_level
+            old_passage = hazard.passage_status
+            h = form.save()
+            HazardDisposal.objects.create(
+                hazard=h,
+                disposal_type='other',
+                status_before=old_status,
+                status_after=h.status,
+                level_before=old_level,
+                level_after=h.hazard_level,
+                passage_before=old_passage,
+                passage_after=h.passage_status,
+                description=request.POST.get('note', '更新隐患状态'),
+                disposed_by=request.POST.get('operator', '系统'),
+            )
+            _sync_road_passage_status(h.road_section)
+            messages.success(request, '隐患状态已更新。')
+        else:
+            messages.error(request, '表单验证失败。')
+    return redirect(request.META.get('HTTP_REFERER', 'roads:hazard_detail'), pk=pk)
+
+
+def hazard_dispose(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+    if hazard.status in ['resolved', 'closed']:
+        messages.warning(request, '该隐患已闭环，无需再次处置。')
+        return redirect('roads:hazard_detail', pk=pk)
+
+    if request.method == 'POST':
+        form = HazardDisposalForm(request.POST)
+        if form.is_valid():
+            d = form.save(commit=False)
+            d.hazard = hazard
+            d.status_before = hazard.status
+            d.level_before = hazard.hazard_level
+            d.passage_before = hazard.passage_status
+            d.save()
+
+            if d.status_after:
+                hazard.status = d.status_after
+            if d.level_after:
+                hazard.hazard_level = d.level_after
+            if d.passage_after:
+                hazard.passage_status = d.passage_after
+            hazard.save()
+            _sync_road_passage_status(hazard.road_section)
+
+            messages.success(request, '处置记录已添加。')
+            return redirect('roads:hazard_detail', pk=pk)
+    else:
+        form = HazardDisposalForm(initial={
+            'disposed_at': timezone.now(),
+            'disposal_type': 'onsite',
+            'status_after': 'disposing' if hazard.status not in ['disposing', 'monitoring'] else hazard.status,
+        })
+    return render(request, 'roads/hazard_dispose.html', {
+        'form': form, 'hazard': hazard
+    })
+
+
+def hazard_close(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+    if request.method == 'POST':
+        old_status = hazard.status
+        closed_by = request.POST.get('closed_by', '系统')
+        note = request.POST.get('close_note', '')
+        hazard.status = 'closed'
+        hazard.closed_by = closed_by
+        hazard.save()
+        HazardDisposal.objects.create(
+            hazard=hazard,
+            disposal_type='closed',
+            status_before=old_status,
+            status_after='closed',
+            level_before=hazard.hazard_level,
+            level_after='safe',
+            passage_before=hazard.passage_status,
+            passage_after='normal',
+            description=note or '隐患已消除，完成闭环',
+            disposed_by=closed_by,
+            disposal_result='隐患闭环归档'
+        )
+        _sync_road_passage_status(hazard.road_section)
+        messages.success(request, '隐患已闭环归档。')
+    return redirect('roads:hazard_detail', pk=pk)
+
+
+def hazard_delete(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+    road_section = hazard.road_section
+    if request.method == 'POST':
+        hazard.delete()
+        _sync_road_passage_status(road_section)
+        messages.success(request, '隐患记录已删除。')
+        return redirect('roads:hazard_list')
+    return render(request, 'roads/hazard_confirm_delete.html', {'hazard': hazard})
+
+
+# ==================== 通行状态管理 ====================
+
+def passage_status_list(request):
+    road_filter = request.GET.get('road')
+
+    for road in RoadSection.objects.all():
+        RoadPassageStatus.objects.get_or_create(road_section=road)
+
+    qs = RoadPassageStatus.objects.select_related(
+        'road_section'
+    ).all().order_by('road_section__code')
+
+    if road_filter:
+        qs = qs.filter(road_section_id=road_filter)
+
+    roads = RoadSection.objects.all()
+
+    stats = {
+        'total': qs.count(),
+        'normal': qs.filter(passage_status='normal').count(),
+        'caution': qs.filter(passage_status='caution').count(),
+        'restricted': qs.filter(passage_status='restricted').count(),
+        'detour': qs.filter(passage_status='detour').count(),
+        'closed': qs.filter(passage_status='closed').count(),
+        'with_hazards': qs.filter(active_hazard_count__gt=0).count(),
+    }
+
+    return render(request, 'roads/passage_status_list.html', {
+        'passage_statuses': qs,
+        'roads': roads,
+        'road_filter': road_filter,
+        'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
+        'stats': stats,
+    })
+
+
+def passage_status_edit(request, pk):
+    ps = get_object_or_404(
+        RoadPassageStatus.objects.select_related('road_section'),
+        pk=pk
+    )
+    if request.method == 'POST':
+        form = RoadPassageStatusForm(request.POST, instance=ps)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '路段通行状态已更新。')
+            return redirect('roads:passage_status_list')
+    else:
+        form = RoadPassageStatusForm(instance=ps)
+    return render(request, 'roads/passage_status_form.html', {
+        'form': form, 'passage_status': ps
+    })
+
+
+def passage_status_recalc(request, pk):
+    ps = get_object_or_404(RoadPassageStatus, pk=pk)
+    old_status = ps.passage_status
+    new_status = ps.recalculate_from_hazards()
+    if old_status != new_status:
+        messages.info(request, f'通行状态已自动更新：从{ps.get_passage_status_display()}调整为{dict(PASSAGE_STATUS_CHOICES)[new_status]}')
+    else:
+        messages.success(request, '已重新计算，状态无变化。')
+    return redirect(request.META.get('HTTP_REFERER', 'roads:passage_status_list'))
+
+
+# ==================== 灾害隐患地图与API ====================
+
+def hazard_map(request):
+    level_filter = request.GET.get('level')
+    status_filter = request.GET.get('status')
+    road_filter = request.GET.get('road')
+
+    return render(request, 'roads/hazard_map.html', {
+        'level_filter': level_filter,
+        'status_filter': status_filter,
+        'road_filter': road_filter,
+        'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
+        'hazard_status_choices': dict(HAZARD_STATUS_CHOICES),
+        'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
+        'roads': RoadSection.objects.all(),
+    })
+
+
+def api_hazards_geo(request):
+    level_filter = request.GET.get('level')
+    status_filter = request.GET.get('status')
+    road_filter = request.GET.get('road')
+
+    hazards = Hazard.objects.select_related(
+        'road_section', 'point'
+    ).exclude(
+        status__in=['resolved', 'closed']
+    ).filter(
+        latitude__isnull=False,
+        longitude__isnull=False
+    )
+
+    if level_filter:
+        hazards = hazards.filter(hazard_level=level_filter)
+    if status_filter:
+        hazards = hazards.filter(status=status_filter)
+    if road_filter:
+        hazards = hazards.filter(road_section_id=road_filter)
+
+    features = []
+    for hz in hazards:
+        features.append({
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Point',
+                'coordinates': [hz.longitude, hz.latitude],
+            },
+            'properties': {
+                'id': hz.id,
+                'code': hz.code,
+                'title': hz.title,
+                'location_type': hz.location_type,
+                'location_type_display': hz.get_location_type_display(),
+                'hazard_type': hz.hazard_type,
+                'hazard_type_display': hz.get_hazard_type_display(),
+                'hazard_level': hz.hazard_level,
+                'hazard_level_display': hz.get_hazard_level_display(),
+                'hazard_level_color': hz.get_hazard_level_color(),
+                'status': hz.status,
+                'status_display': hz.get_status_display(),
+                'passage_status': hz.passage_status,
+                'passage_display': hz.get_passage_status_display(),
+                'passage_color': hz.get_passage_status_color(),
+                'road_section': hz.road_section.name if hz.road_section else '',
+                'road_section_id': hz.road_section.id if hz.road_section else None,
+                'reported_at': hz.reported_at.strftime('%Y-%m-%d %H:%M'),
+                'reported_by': hz.reported_by,
+                'control_suggestion': hz.get_control_suggestion_display(),
+                'progress': hz.get_progress_percentage(),
+                'description': hz.description[:100] + ('...' if len(hz.description) > 100 else ''),
+                'is_high_risk': hz.hazard_level in ['severe', 'critical'],
+            }
+        })
+
+    return JsonResponse({
+        'type': 'FeatureCollection',
+        'features': features,
+    })
+
+
+def api_roads_passage_status(request):
+    result = []
+    for road in RoadSection.objects.all():
+        ps, _ = RoadPassageStatus.objects.get_or_create(road_section=road)
+        hazards = road.hazards.exclude(status__in=['resolved', 'closed'])
+        hazard_points = []
+        for hz in hazards.filter(latitude__isnull=False, longitude__isnull=False):
+            hazard_points.append([hz.longitude, hz.latitude])
+        result.append({
+            'road_id': road.id,
+            'road_code': road.code,
+            'road_name': road.name,
+            'passage_status': ps.passage_status,
+            'passage_display': ps.get_passage_status_display(),
+            'status_color': ps.get_status_color(),
+            'active_hazard_count': ps.active_hazard_count,
+            'critical_hazard_count': ps.critical_hazard_count,
+            'status_reason': ps.status_reason,
+            'hazard_points': hazard_points,
+        })
+    return JsonResponse({'roads': result})
+
+
+def api_hazard_summary(request):
+    total = Hazard.objects.count()
+    active = Hazard.objects.exclude(status__in=['resolved', 'closed'])
+    today = timezone.now().date()
+    level_data = {}
+    for level, label in HAZARD_LEVEL_CHOICES:
+        level_data[level] = {
+            'label': label,
+            'active': active.filter(hazard_level=level).count(),
+            'total': Hazard.objects.filter(hazard_level=level).count(),
+        }
+    status_data = {}
+    for status, label in HAZARD_STATUS_CHOICES:
+        status_data[status] = {
+            'label': label,
+            'count': Hazard.objects.filter(status=status).count(),
+        }
+    type_data = {}
+    for htype, label in HAZARD_TYPE_CHOICES:
+        type_data[htype] = {
+            'label': label,
+            'active': active.filter(hazard_type=htype).count(),
+        }
+    overdue = active.filter(disposal_deadline__lt=today).count()
+    today_new = Hazard.objects.filter(reported_date=today).count()
+
+    return JsonResponse({
+        'total': total,
+        'active': active.count(),
+        'resolved': total - active.count(),
+        'overdue': overdue,
+        'today_new': today_new,
+        'by_level': level_data,
+        'by_status': status_data,
+        'by_type': type_data,
+    })

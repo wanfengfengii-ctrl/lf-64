@@ -53,6 +53,17 @@
                             <li><a class="dropdown-item" href="{% url 'roads:task_create' %}">任务派发</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            灾害预警
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'roads:hazard_list' %}">隐患管理</a></li>
+                            <li><a class="dropdown-item" href="{% url 'roads:hazard_create' %}">隐患上报</a></li>
+                            <li><a class="dropdown-item" href="{% url 'roads:hazard_map' %}">预警地图</a></li>
+                            <li><a class="dropdown-item" href="{% url 'roads:passage_status_list' %}">通行状态</a></li>
+                        </ul>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'export' %}active{% endif %}" href="{% url 'roads:export' %}">数据导出</a>
                     </li>

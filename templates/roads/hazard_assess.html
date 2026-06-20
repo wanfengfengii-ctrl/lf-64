@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}隐患评估 - {{ hazard.code }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_list' %}">隐患管理</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_detail' hazard.pk %}">{{ hazard.code }}</a></li>
+        <li class="breadcrumb-item active">等级评估</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🔍 隐患等级评估 - {{ hazard.code }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>{{ hazard.title }}</strong>
+                        <span class="badge badge-hazard-reported">待评估</span>
+                    </div>
+                    <div class="small text-muted mb-2">
+                        {{ hazard.get_location_type_display }} · {{ hazard.get_hazard_type_display }} · 
+                        {% if hazard.road_section %}{{ hazard.road_section.name }}{% endif %}
+                    </div>
+                    <div class="small">
+                        <strong>隐患描述：</strong>{{ hazard.description|truncatechars:200 }}
+                    </div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">预警等级 <span class="text-danger">*</span></label>
+                            {{ form.hazard_level }}
+                            <div class="form-text">根据隐患严重程度评估</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">处置状态</label>
+                            {{ form.status }}
+                            <div class="form-text">评估后流转的状态</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">处置期限</label>
+                            {{ form.disposal_deadline }}
+                            <div class="form-text">要求完成处置的截止日期</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">封控建议</label>
+                            {{ form.control_suggestion }}
+                            <div class="form-text">对该位置的封控措施建议</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">通行状态</label>
+                            {{ form.passage_status }}
+                            <div class="form-text">评估后该位置的通行状态</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">评估意见 <span class="text-danger">*</span></label>
+                        {{ form.assess_note }}
+                        <div class="form-text">详细描述评估依据、风险分析和处置建议方案</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">评估人 <span class="text-danger">*</span></label>
+                        {{ form.assessed_by }}
+                    </div>
+
+                    {% if form.errors %}
+                    <div class="alert alert-danger mb-4">
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                            <div><strong>{{ field.label }}:</strong> {{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'roads:hazard_detail' hazard.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">提交评估结果</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">📖 评估参考标准</div>
+            <div class="card-body">
+                <div class="small">
+                    <div class="mb-3 p-2 border-start border-info border-3 bg-info bg-opacity-10 rounded">
+                        <div class="fw-semibold mb-1"><span class="badge badge-hazard-info">提示</span> (Info)</div>
+                        <div>对通行无明显影响，需在下次巡查时关注。例如：少量积水、轻微湿滑等。</div>
+                    </div>
+                    <div class="mb-3 p-2 border-start border-warning border-3 bg-warning bg-opacity-10 rounded">
+                        <div class="fw-semibold mb-1"><span class="badge badge-hazard-warning">警告</span> (Warning)</div>
+                        <div>对通行有一定影响，需安排处置。例如：局部落石、排水沟堵塞、路面裂缝等。</div>
+                    </div>
+                    <div class="mb-3 p-2 border-start border-danger border-3 bg-danger bg-opacity-10 rounded">
+                        <div class="fw-semibold mb-1"><span class="badge badge-hazard-severe">严重</span> (Severe)</div>
+                        <div>严重影响通行安全，需尽快处置。例如：小型塌方、边坡变形、桥涵结构问题等。</div>
+                    </div>
+                    <div class="p-2 border-start border-danger border-4 bg-danger bg-opacity-20 rounded">
+                        <div class="fw-semibold mb-1"><span class="badge badge-hazard-critical">紧急</span> (Critical)</div>
+                        <div>严重威胁人员生命安全，需立即处置并封闭道路。例如：大面积塌方、严重断裂、泥石流等。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}路段通行状态 - 古驿道巡查养护闭环管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">🛣️ 路段通行状态管理</h3>
+    <div>
+        <a href="{% url 'roads:hazard_list' %}" class="btn btn-outline-primary">隐患管理</a>
+        <a href="{% url 'roads:hazard_map' %}" class="btn btn-outline-info ms-2">预警地图</a>
+    </div>
+</div>
+
+<div class="quick-stats-grid">
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#28a745;">{{ stats.normal }}</div>
+        <div class="quick-stat-label">✅ 正常通行</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#ffc107;">{{ stats.caution }}</div>
+        <div class="quick-stat-label">⚠️ 谨慎通行</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#fd7e14;">{{ stats.restricted }}</div>
+        <div class="quick-stat-label">🚧 限制通行</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#6f42c1;">{{ stats.detour }}</div>
+        <div class="quick-stat-label">🔀 建议绕行</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#dc3545;">{{ stats.closed }}</div>
+        <div class="quick-stat-label">⛔ 禁止通行</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#6c757d;">{{ stats.with_hazards }}</div>
+        <div class="quick-stat-label">⚠️ 含隐患路段</div>
+    </div>
+    <div class="quick-stat-card">
+        <div class="quick-stat-value" style="color:#5c4033;">{{ stats.total }}</div>
+        <div class="quick-stat-label">路段总数</div>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small text-muted mb-1">路段筛选</label>
+            <select name="road" class="form-select">
+                <option value="">全部路段</option>
+                {% for road in roads %}
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ road.code }} - {{ road.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+            <a href="{% url 'roads:passage_status_list' %}" class="btn btn-outline-secondary btn-sm">重置</a>
+            <button type="button" id="recalc-all" class="btn btn-outline-info btn-sm ms-2">
+                🔄 根据隐患重新计算
+            </button>
+        </div>
+        <div class="col-md-4 text-end">
+            <small class="text-muted">
+                💡 路段通行状态会根据隐患等级自动联动更新
+            </small>
+        </div>
+    </form>
+</div>
+
+<div class="row g-3">
+    {% for ps in passage_statuses %}
+    <div class="col-md-6 col-lg-4">
+        <div class="status-banner {{ ps.passage_status }}" style="margin-bottom:0;">
+            <div>
+                <div class="fw-bold fs-5">{{ ps.road_section.code }}</div>
+                <div class="small opacity-75">{{ ps.road_section.name }}</div>
+            </div>
+            <span class="badge badge-passage-{{ ps.passage_status }}" style="font-size:0.95rem;">
+                {{ passage_status_choices|get_item:ps.passage_status }}
+            </span>
+        </div>
+        <div class="card rounded-0 rounded-bottom" style="border-radius:0 0 10px 10px !important;">
+            <div class="card-body">
+                <div class="mb-2">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <div class="small text-muted">活跃隐患</div>
+                            <div class="fw-bold fs-5" style="color:{% if ps.active_hazard_count > 0 %}#dc3545{% else %}#28a745{% endif %}">
+                                {{ ps.active_hazard_count }}
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted">紧急隐患</div>
+                            <div class="fw-bold fs-5" style="color:{% if ps.critical_hazard_count > 0 %}#dc3545{% else %}#6c757d{% endif %}">
+                                {{ ps.critical_hazard_count }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if ps.status_reason %}
+                <div class="mb-2 p-2 bg-light rounded small">
+                    <span class="text-muted">📋 状态原因：</span>{{ ps.status_reason }}
+                </div>
+                {% endif %}
+
+                {% if ps.affected_start_km or ps.affected_end_km %}
+                <div class="mb-2 small">
+                    <span class="text-muted">影响范围：</span>
+                    K{{ ps.affected_start_km|default:0 }} ~ K{{ ps.affected_end_km|default:ps.road_section.length_km }}
+                </div>
+                {% endif %}
+
+                {% if ps.notice_public %}
+                <div class="mb-2 p-2 border-start border-3 border-warning bg-warning bg-opacity-10 rounded small">
+                    <strong>📢 公告：</strong>{{ ps.notice_public }}
+                </div>
+                {% endif %}
+
+                <div class="mb-3 small text-muted">
+                    <div>生效时间：{{ ps.effective_from|date:"Y-m-d H:i" }}</div>
+                    {% if ps.estimated_resume %}
+                    <div>预计恢复：<span class="fw-semibold">{{ ps.estimated_resume|date:"Y-m-d H:i" }}</span></div>
+                    {% endif %}
+                    <div>更新时间：{{ ps.updated_at|date:"Y-m-d H:i" }}</div>
+                    {% if ps.updated_by %}
+                    <div>更新人：{{ ps.updated_by }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a href="{% url 'roads:passage_status_edit' ps.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                        ✏️ 编辑状态
+                    </a>
+                    <a href="{% url 'roads:passage_status_recalc' ps.pk %}" class="btn btn-sm btn-outline-info"
+                       onclick="return confirm('确定要根据该路段的隐患重新计算通行状态吗？')">
+                        🔄
+                    </a>
+                    <a href="{% url 'roads:hazard_list' %}?road={{ ps.road_section.pk }}" class="btn btn-sm btn-outline-secondary" title="查看该路段隐患">
+                        🔍
+                    </a>
+                    <a href="{% url 'roads:road_detail' ps.road_section.pk %}" class="btn btn-sm btn-outline-secondary" title="路段详情">
+                        📄
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="text-center text-muted py-5">
+            <div style="font-size:3rem;opacity:0.3;">🛣️</div>
+            <div>暂无路段数据，请先创建路段档案</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('recalc-all').addEventListener('click', function() {
+    if (!confirm('确定要根据所有路段的隐患情况重新计算通行状态吗？')) return;
+    const buttons = document.querySelectorAll('a[href*="passage_status_recalc"]');
+    let count = 0;
+    const total = buttons.length;
+    buttons.forEach((btn, idx) => {
+        setTimeout(() => {
+            fetch(btn.href, { method: 'GET', credentials: 'same-origin' })
+                .then(() => {
+                    count++;
+                    if (count === total) {
+                        location.reload();
+                    }
+                });
+        }, idx * 200);
+    });
+});
+</script>
+{% endblock %}

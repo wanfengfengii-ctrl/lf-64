@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}编辑通行状态 - {{ passage_status.road_section.code }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:passage_status_list' %}">通行状态</a></li>
+        <li class="breadcrumb-item active">{{ passage_status.road_section.code }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="status-banner {{ passage_status.passage_status }}">
+            <div>
+                <div class="fw-bold fs-4">{{ passage_status.road_section.code }}</div>
+                <div class="opacity-75">{{ passage_status.road_section.name }}</div>
+            </div>
+            <span class="badge badge-passage-{{ passage_status.passage_status }}" style="font-size:1rem;">
+                {{ passage_status.get_passage_status_display }}
+            </span>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">✏️ 编辑路段通行状态</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4 p-3 bg-light rounded">
+                    <div class="col-md-4">
+                        <div class="small text-muted">当前活跃隐患</div>
+                        <div class="fw-bold fs-4">{{ passage_status.active_hazard_count }} 处</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="small text-muted">紧急隐患</div>
+                        <div class="fw-bold fs-4 text-danger">{{ passage_status.critical_hazard_count }} 处</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="small text-muted">路段长度</div>
+                        <div class="fw-bold fs-4">{{ passage_status.road_section.length_km }} km</div>
+                    </div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <label class="form-label">通行状态 <span class="text-danger">*</span></label>
+                        {{ form.passage_status }}
+                        <div class="form-text">
+                            <span class="badge-passage-normal me-2">正常</span>
+                            <span class="badge-passage-caution me-2">谨慎</span>
+                            <span class="badge-passage-restricted me-2">限制</span>
+                            <span class="badge-passage-detour me-2">绕行</span>
+                            <span class="badge-passage-closed">封闭</span>
+                        </div>
+                        {% if form.passage_status.errors %}
+                        <div class="text-danger small">{{ form.passage_status.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.affected_start_km.label }}</label>
+                            {{ form.affected_start_km }}
+                            <div class="form-text">公里数，例如：3.2 表示 K3+200</div>
+                            {% if form.affected_start_km.errors %}
+                            <div class="text-danger small">{{ form.affected_start_km.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.affected_end_km.label }}</label>
+                            {{ form.affected_end_km }}
+                            <div class="form-text">公里数，留空表示影响到路段终点</div>
+                            {% if form.affected_end_km.errors %}
+                            <div class="text-danger small">{{ form.affected_end_km.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">状态原因说明</label>
+                        {{ form.status_reason }}
+                        <div class="form-text">简要说明设置该通行状态的原因</div>
+                        {% if form.status_reason.errors %}
+                        <div class="text-danger small">{{ form.status_reason.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.updated_by.label }}</label>
+                            {{ form.updated_by }}
+                            {% if form.updated_by.errors %}
+                            <div class="text-danger small">{{ form.updated_by.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">预计恢复时间</label>
+                            {{ form.estimated_resume }}
+                            <div class="form-text">预计道路恢复正常通行的时间</div>
+                            {% if form.estimated_resume.errors %}
+                            <div class="text-danger small">{{ form.estimated_resume.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">对外公告内容</label>
+                        {{ form.notice_public }}
+                        <div class="form-text">发布在对外渠道的公告信息，留空则不发布公告</div>
+                        {% if form.notice_public.errors %}
+                        <div class="text-danger small">{{ form.notice_public.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <div class="mb-2"><strong>💡 小提示：</strong></div>
+                        <div class="small">
+                            点击下方"根据隐患重新计算"按钮，可根据该路段当前所有未闭环隐患的最高等级自动设置通行状态：
+                            <ul class="mb-0 mt-2">
+                                <li>存在紧急/严重隐患 → <strong class="text-danger">禁止通行/限制通行</strong></li>
+                                <li>存在警告级隐患 → <strong class="text-warning">限制通行</strong></li>
+                                <li>存在提示级隐患 → <strong class="text-info">谨慎通行</strong></li>
+                                <li>无活跃隐患 → <strong class="text-success">正常通行</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between gap-2">
+                        <div>
+                            <a href="{% url 'roads:passage_status_recalc' passage_status.pk %}" class="btn btn-outline-info"
+                               onclick="return confirm('确定要根据隐患情况重新计算吗？当前手动设置将被覆盖。')">
+                                🔄 根据隐患重新计算
+                            </a>
+                        </div>
+                        <div>
+                            <a href="{% url 'roads:passage_status_list' %}" class="btn btn-outline-secondary">取消</a>
+                            <button type="submit" class="btn btn-primary ms-2">保存修改</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
