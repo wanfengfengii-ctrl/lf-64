@@ -115,7 +115,7 @@
                             <td><a href="{% url 'roads:point_detail' point.pk %}">{{ point.name }}</a></td>
                             <td><span class="badge badge-type-{{ point.point_type }}">{{ point.get_point_type_display }}</span></td>
                             <td>
-                                {% if point.is_high_risk_annotated %}
+                                {% if point.is_high_risk %}
                                 <span class="risk-indicator risk-high">⚠️ 高风险</span>
                                 {% else %}
                                 <span class="risk-indicator risk-normal">正常</span>

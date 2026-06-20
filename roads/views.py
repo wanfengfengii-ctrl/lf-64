@@ -1,6 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
-from django.urls import reverse
 from django.db.models import Count, Avg, Q, Max, Min, F, Exists, OuterRef
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -15,15 +14,12 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from .models import (
     RoadSection, Point, InspectionRecord, Photo, Alert, TaskOrder,
     Hazard, HazardDisposal, RoadPassageStatus,
-    OpenSchedule, TemporaryControl, VisitorFlowRecord,
     WEAR_LEVEL_CHOICES, POINT_TYPE_CHOICES, ROAD_STATUS_CHOICES,
     ALERT_LEVEL_CHOICES, ALERT_TYPE_CHOICES, TASK_STATUS_CHOICES,
     HAZARD_LOCATION_TYPE_CHOICES, HAZARD_TYPE_CHOICES,
     HAZARD_LEVEL_CHOICES, HAZARD_STATUS_CHOICES,
     CONTROL_SUGGESTION_CHOICES, PASSAGE_STATUS_CHOICES,
-    DISPOSAL_TYPE_CHOICES, SEASON_CHOICES, WEATHER_CONDITION_CHOICES,
-    CONTROL_TYPE_CHOICES, FLOW_RECORD_TYPE_CHOICES,
-    OPEN_STATUS_CHOICES, MAINTENANCE_STATUS_CHOICES,
+    DISPOSAL_TYPE_CHOICES,
 )
 from .forms import (
     RoadSectionForm, PointForm, InspectionRecordForm,
@@ -31,7 +27,6 @@ from .forms import (
     TaskReviewForm, AlertForm, DataExportForm,
     HazardForm, HazardAssessForm, HazardStatusForm,
     HazardDisposalForm, RoadPassageStatusForm,
-    OpenScheduleForm, TemporaryControlForm, VisitorFlowRecordForm,
 )
 
 
@@ -114,43 +109,6 @@ def dashboard(request):
     for item in task_status_stats:
         task_stats_dict[item['status']] = item['count']
 
-    total_hazards = Hazard.objects.count()
-    active_hazards = Hazard.objects.exclude(status__in=['resolved', 'closed'])
-    critical_hazards = active_hazards.filter(hazard_level='critical').count()
-    severe_hazards = active_hazards.filter(hazard_level='severe').count()
-    warning_hazards = active_hazards.filter(hazard_level='warning').count()
-    disposing_hazards = active_hazards.filter(status='disposing').count()
-    overdue_hazards = active_hazards.filter(disposal_deadline__lt=timezone.now().date()).count()
-    roads_with_hazards = RoadSection.objects.annotate(
-        hazard_count=Count('hazards', filter=~Q(hazards__status__in=['resolved', 'closed']), distinct=True)
-    ).filter(hazard_count__gt=0).order_by('-hazard_count')[:5]
-
-    recent_hazards = Hazard.objects.select_related(
-        'road_section', 'point'
-    ).prefetch_related('disposals').order_by('-reported_at')[:8]
-
-    hazard_level_distribution = active_hazards.values('hazard_level').annotate(
-        count=Count('id')
-    ).order_by('hazard_level')
-    hazard_level_dict = {level: 0 for level, _ in HAZARD_LEVEL_CHOICES if level != 'safe'}
-    for item in hazard_level_distribution:
-        hazard_level_dict[item['hazard_level']] = item['count']
-
-    passage_status_stats = RoadPassageStatus.objects.values('passage_status').annotate(
-        count=Count('id')
-    )
-    passage_stats_dict = {s: 0 for s, _ in PASSAGE_STATUS_CHOICES}
-    for item in passage_status_stats:
-        passage_stats_dict[item['passage_status']] = item['count']
-
-    active_schedules = OpenSchedule.objects.filter(is_active=True).count()
-    active_controls = TemporaryControl.objects.filter(
-        is_active=True, end_time__gte=timezone.now()
-    ).count()
-    today_flows = VisitorFlowRecord.objects.filter(
-        record_date=timezone.now().date()
-    )
-
     return render(request, 'roads/dashboard.html', {
         'total_roads': total_roads,
         'total_points': total_points,
@@ -169,23 +127,6 @@ def dashboard(request):
         'wear_stats_list': wear_stats_list,
         'task_stats_dict': task_stats_dict,
         'task_status_choices': dict(TASK_STATUS_CHOICES),
-        'total_hazards': total_hazards,
-        'active_hazards_count': active_hazards.count(),
-        'critical_hazards': critical_hazards,
-        'severe_hazards': severe_hazards,
-        'warning_hazards': warning_hazards,
-        'disposing_hazards': disposing_hazards,
-        'overdue_hazards': overdue_hazards,
-        'recent_hazards': recent_hazards,
-        'hazard_level_dict': hazard_level_dict,
-        'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
-        'hazard_status_choices': dict(HAZARD_STATUS_CHOICES),
-        'roads_with_hazards': roads_with_hazards,
-        'passage_stats_dict': passage_stats_dict,
-        'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
-        'active_schedules': active_schedules,
-        'active_controls': active_controls,
-        'today_flow_count': today_flows.count(),
     })
 
 
@@ -286,44 +227,15 @@ def charts_view(request):
         else:
             year = today.year
             month = today.month - i
-        for level, _ in WEAR_LEVEL_CHOICES:
-            count = InspectionRecord.objects.filter(
-                inspection_date__year=year,
-                inspection_date__month=month,
-                wear_level=level
-            ).count()
-            wear_count_data[level][idx] = count
-
-    hazard_level_count = defaultdict(lambda: [0] * len(labels))
-    hazard_total = [0] * len(labels)
-    hazard_critical_severe = [0] * len(labels)
-
-    for i in range(months_count - 1, -1, -1):
-        idx = months_count - 1 - i
-        if today.month - i <= 0:
-            year = today.year - 1
-            month = today.month - i + 12
-        else:
-            year = today.year
-            month = today.month - i
-
-        month_hazards = Hazard.objects.filter(
-            reported_date__year=year,
-            reported_date__month=month
+        qs = InspectionRecord.objects.filter(
+            inspection_date__year=year,
+            inspection_date__month=month,
         )
-        total = month_hazards.count()
-        hazard_total[idx] = total
-
-        critical_severe = month_hazards.filter(
-            hazard_level__in=['critical', 'severe']
-        ).count()
-        hazard_critical_severe[idx] = critical_severe
-
-        for level, _ in HAZARD_LEVEL_CHOICES:
-            if level == 'safe':
-                continue
-            count = month_hazards.filter(hazard_level=level).count()
-            hazard_level_count[level][idx] = count
+        if selected_road_id:
+            qs = qs.filter(point__road_section_id=selected_road_id)
+        for level, _ in WEAR_LEVEL_CHOICES:
+            count = qs.filter(wear_level=level).count()
+            wear_count_data[level][idx] = count
 
     return render(request, 'roads/charts.html', {
         'roads': roads,
@@ -335,10 +247,6 @@ def charts_view(request):
         'road_data': road_data,
         'wear_level_choices': dict(WEAR_LEVEL_CHOICES),
         'wear_count_data': dict(wear_count_data),
-        'hazard_level_count': dict(hazard_level_count),
-        'hazard_total': hazard_total,
-        'hazard_critical_severe': hazard_critical_severe,
-        'hazard_level_choices': {k: v for k, v in HAZARD_LEVEL_CHOICES if k != 'safe'},
     })
 
 
@@ -496,10 +404,12 @@ def point_list(request):
     ).order_by('code')
 
     roads = RoadSection.objects.all()
+    road_filter_id = int(road_filter) if road_filter and road_filter.isdigit() else None
     return render(request, 'roads/point_list.html', {
         'points': points,
         'roads': roads,
         'road_filter': road_filter,
+        'road_filter_id': road_filter_id,
         'type_filter': type_filter,
         'risk_filter': risk_filter,
         'point_type_choices': dict(POINT_TYPE_CHOICES),
@@ -679,6 +589,7 @@ def alert_list(request):
 
     alerts = alerts.order_by('-created_at')
     roads = RoadSection.objects.all()
+    road_filter_id = int(road_filter) if road_filter and road_filter.isdigit() else None
 
     return render(request, 'roads/alert_list.html', {
         'alerts': alerts,
@@ -687,6 +598,7 @@ def alert_list(request):
         'type_filter': type_filter,
         'status_filter': status_filter,
         'road_filter': road_filter,
+        'road_filter_id': road_filter_id,
         'alert_level_choices': dict(ALERT_LEVEL_CHOICES),
         'alert_type_choices': dict(ALERT_TYPE_CHOICES),
     })
@@ -852,6 +764,7 @@ def task_list(request):
 
     tasks = tasks.order_by('-created_at')
     roads = RoadSection.objects.all()
+    road_filter_id = int(road_filter) if road_filter and road_filter.isdigit() else None
 
     stats = {
         'total': tasks.count(),
@@ -868,6 +781,7 @@ def task_list(request):
         'status_filter': status_filter,
         'priority_filter': priority_filter,
         'road_filter': road_filter,
+        'road_filter_id': road_filter_id,
         'assigned_filter': assigned_filter,
         'overdue_filter': overdue_filter,
         'task_status_choices': dict(TASK_STATUS_CHOICES),
@@ -903,6 +817,20 @@ def task_create(request, inspection_pk=None):
             initial['priority'] = 'urgent'
         elif inspection.wear_level == 3:
             initial['priority'] = 'high'
+    elif request.GET.get('point'):
+        point_pk = request.GET.get('point')
+        point = get_object_or_404(Point, pk=point_pk)
+        initial['point'] = point
+        initial['title'] = f'{point.code} - 磨损整改'
+        worst = point.get_worst_unhandled_inspection()
+        if worst:
+            initial['inspection'] = worst
+            initial['title'] = f'{point.code} - {worst.get_wear_level_display()}磨损整改'
+            initial['description'] = worst.maintenance_suggestion or worst.wear_description
+            if worst.wear_level == 4:
+                initial['priority'] = 'urgent'
+            elif worst.wear_level == 3:
+                initial['priority'] = 'high'
 
     if request.method == 'POST':
         form = TaskOrderForm(request.POST)
@@ -1209,12 +1137,7 @@ def priority_list(request):
         'point', 'point__road_section'
     ).order_by('-wear_level', 'inspection_date')
 
-    active_hazards = Hazard.objects.filter(
-        status__in=['reported', 'assessing', 'disposing', 'monitoring']
-    ).select_related('point', 'point__road_section').order_by('-reported_at')
-
     priority_items = []
-
     for insp in unhandled:
         days_pending = (timezone.now().date() - insp.inspection_date).days
         priority_score = insp.wear_level * 100 + days_pending
@@ -1234,68 +1157,15 @@ def priority_list(request):
 
         has_task = TaskOrder.objects.filter(
             inspection=insp
-        ).exclude(status='closed').first()
+        ).exclude(status='closed').exists()
 
         priority_items.append({
-            'type': 'wear',
-            'type_label': '磨损养护',
-            'type_badge': 'bg-primary',
             'inspection': insp,
             'priority': priority,
             'priority_class': priority_class,
             'priority_score': priority_score,
             'days_pending': days_pending,
             'has_task': has_task,
-            'point': insp.point,
-            'road_section': insp.point.road_section,
-            'description': insp.maintenance_suggestion or '定期巡查维护',
-            'detail_url': reverse('roads:inspection_detail', args=[insp.pk]),
-            'task_create_url': reverse('roads:task_create_from_insp', args=[insp.pk]),
-        })
-
-    hazard_level_score = {
-        'critical': 500,
-        'severe': 400,
-        'warning': 300,
-        'info': 200,
-        'safe': 100,
-    }
-    hazard_priority_map = {
-        'critical': ('紧急', 'danger'),
-        'severe': ('高', 'warning'),
-        'warning': ('中', 'info'),
-        'info': ('低', 'secondary'),
-        'safe': ('低', 'secondary'),
-    }
-
-    for hazard in active_hazards:
-        days_pending = (timezone.now().date() - hazard.reported_at.date()).days
-        level_score = hazard_level_score.get(hazard.hazard_level, 100)
-        priority_score = level_score + days_pending
-
-        priority, priority_class = hazard_priority_map.get(
-            hazard.hazard_level, ('低', 'secondary')
-        )
-
-        has_task = TaskOrder.objects.filter(
-            hazard=hazard
-        ).exclude(status='closed').first()
-
-        priority_items.append({
-            'type': 'hazard',
-            'type_label': '灾害隐患',
-            'type_badge': 'bg-danger',
-            'hazard': hazard,
-            'priority': priority,
-            'priority_class': priority_class,
-            'priority_score': priority_score,
-            'days_pending': days_pending,
-            'has_task': has_task,
-            'point': hazard.point,
-            'road_section': hazard.point.road_section,
-            'description': hazard.description or hazard.get_hazard_type_display(),
-            'detail_url': reverse('roads:hazard_detail', args=[hazard.pk]),
-            'task_create_url': reverse('roads:hazard_task_create', args=[hazard.pk]),
         })
 
     priority_items.sort(key=lambda x: x['priority_score'], reverse=True)
@@ -1307,8 +1177,6 @@ def priority_list(request):
         'low': sum(1 for p in priority_items if p['priority'] == '低'),
         'with_task': sum(1 for p in priority_items if p['has_task']),
         'total': len(priority_items),
-        'wear_count': sum(1 for p in priority_items if p['type'] == 'wear'),
-        'hazard_count': sum(1 for p in priority_items if p['type'] == 'hazard'),
     }
     stats['without_task'] = stats['total'] - stats['with_task']
 
@@ -1613,15 +1481,13 @@ def hazard_detail(request, pk):
     hazard = get_object_or_404(
         Hazard.objects.select_related(
             'road_section', 'point', 'inspection_source'
-        ).prefetch_related('disposals', 'disposals__related_task', 'task_orders'),
+        ).prefetch_related('disposals', 'disposals__related_task'),
         pk=pk
     )
     disposals = hazard.disposals.all().order_by('-disposed_at')
-    task_orders = hazard.task_orders.all().order_by('-created_at')
     return render(request, 'roads/hazard_detail.html', {
         'hazard': hazard,
         'disposals': disposals,
-        'task_orders': task_orders,
         'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
         'hazard_type_choices': dict(HAZARD_TYPE_CHOICES),
         'location_type_choices': dict(HAZARD_LOCATION_TYPE_CHOICES),
@@ -1629,7 +1495,6 @@ def hazard_detail(request, pk):
         'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
         'control_choices': dict(CONTROL_SUGGESTION_CHOICES),
         'disposal_type_choices': dict(DISPOSAL_TYPE_CHOICES),
-        'task_status_choices': dict(TASK_STATUS_CHOICES),
     })
 
 
@@ -1798,67 +1663,6 @@ def hazard_delete(request, pk):
         messages.success(request, '隐患记录已删除。')
         return redirect('roads:hazard_list')
     return render(request, 'roads/hazard_confirm_delete.html', {'hazard': hazard})
-
-
-def hazard_task_create(request, pk):
-    hazard = get_object_or_404(Hazard, pk=pk)
-
-    level_priority_map = {
-        'critical': 'urgent',
-        'severe': 'urgent',
-        'warning': 'high',
-        'info': 'medium',
-        'safe': 'low',
-    }
-    priority = level_priority_map.get(hazard.hazard_level, 'high')
-
-    initial = {
-        'hazard': hazard,
-        'title': f'{hazard.code} - {hazard.title} 应急处置',
-        'description': f'隐患编号：{hazard.code}\n隐患类型：{hazard.get_hazard_type_display()}\n预警等级：{hazard.get_hazard_level_display()}\n\n隐患描述：\n{hazard.description}\n\n封控建议：{hazard.get_control_suggestion_display()}',
-        'priority': priority,
-    }
-    if hazard.point:
-        initial['point'] = hazard.point
-    if hazard.disposal_deadline:
-        initial['deadline'] = hazard.disposal_deadline
-    else:
-        days_map = {'critical': 1, 'severe': 3, 'warning': 7, 'info': 14, 'safe': 30}
-        initial['deadline'] = timezone.now().date() + timedelta(days=days_map.get(hazard.hazard_level, 7))
-
-    if request.method == 'POST':
-        form = TaskOrderForm(request.POST)
-        if form.is_valid():
-            task = form.save(commit=False)
-            task.hazard = hazard
-            task.status = 'dispatched'
-            task.dispatched_at = timezone.now()
-            task.save()
-
-            disposal = HazardDisposal.objects.create(
-                hazard=hazard,
-                disposal_type='dispatch',
-                status_before=hazard.status,
-                status_after='disposing' if hazard.status in ['reported', 'assessing'] else hazard.status,
-                level_before=hazard.hazard_level,
-                passage_before=hazard.passage_status,
-                description=f'派发应急处置工单：{task.title}\n指派人员：{task.assigned_to or "待指派"}\n整改期限：{task.deadline or "未设定"}',
-                disposed_by=request.user.username if request.user.is_authenticated else '系统',
-                related_task=task,
-            )
-
-            if hazard.status in ['reported', 'assessing']:
-                hazard.status = 'disposing'
-                hazard.save()
-
-            messages.success(request, f'应急工单已创建并派发：{task.title}')
-            return redirect('roads:hazard_detail', pk=pk)
-    else:
-        form = TaskOrderForm(initial=initial)
-    return render(request, 'roads/hazard_task_create.html', {
-        'form': form,
-        'hazard': hazard,
-    })
 
 
 # ==================== 通行状态管理 ====================
@@ -2064,545 +1868,4 @@ def api_hazard_summary(request):
         'by_level': level_data,
         'by_status': status_data,
         'by_type': type_data,
-    })
-
-
-# ==================== 游客承载与开放时段管理模块 ====================
-
-def _get_current_season():
-    month = timezone.now().month
-    if month in [3, 4, 5]:
-        return 'spring'
-    elif month in [6, 7, 8]:
-        return 'summer'
-    elif month in [9, 10, 11]:
-        return 'autumn'
-    return 'winter'
-
-
-def _generate_open_suggestion(road_section):
-    suggestions = []
-    schedule = OpenSchedule.objects.filter(
-        road_section=road_section, is_active=True
-    ).first()
-    passage = RoadPassageStatus.objects.filter(
-        road_section=road_section
-    ).first()
-    active_controls = TemporaryControl.objects.filter(
-        road_section=road_section, is_active=True,
-        end_time__gte=timezone.now()
-    )
-    hazards = road_section.hazards.exclude(status__in=['resolved', 'closed'])
-    critical_hazards = hazards.filter(hazard_level__in=['severe', 'critical'])
-
-    if critical_hazards.exists():
-        suggestions.append({
-            'level': 'critical',
-            'message': f'存在{critical_hazards.count()}处紧急/严重隐患，建议暂停开放。',
-            'action': 'closed'
-        })
-    elif hazards.filter(hazard_level='warning').exists():
-        suggestions.append({
-            'level': 'warning',
-            'message': '存在警告级隐患，建议限制开放并降低承载量。',
-            'action': 'restricted'
-        })
-
-    if passage and passage.passage_status == 'closed':
-        suggestions.append({
-            'level': 'critical',
-            'message': '路段通行状态为禁止通行，不宜开放游览。',
-            'action': 'closed'
-        })
-    elif passage and passage.passage_status in ['restricted', 'detour']:
-        suggestions.append({
-            'level': 'warning',
-            'message': f'路段通行状态为{passage.get_passage_status_display()}，建议限制开放。',
-            'action': 'restricted'
-        })
-
-    if schedule and schedule.maintenance_status != 'normal':
-        status_map = {
-            'maintaining': '养护中',
-            'repairing': '修缮中',
-            'emergency': '应急抢修'
-        }
-        suggestions.append({
-            'level': 'warning',
-            'message': f'路段处于{status_map.get(schedule.maintenance_status, "异常")}状态，建议调整开放计划。',
-            'action': 'restricted' if schedule.maintenance_status != 'emergency' else 'closed'
-        })
-
-    unhandled_critical = road_section.points.filter(
-        inspections__wear_level=4, inspections__handled=False
-    ).exists()
-    if unhandled_critical:
-        suggestions.append({
-            'level': 'warning',
-            'message': '存在未处理的严重磨损点位，建议控制游客量。',
-            'action': 'restricted'
-        })
-
-    if active_controls.exists():
-        for ctrl in active_controls:
-            suggestions.append({
-                'level': 'info',
-                'message': f'临时管制：{ctrl.get_control_type_display()} - {ctrl.reason[:50]}',
-                'action': ctrl.open_status
-            })
-
-    if not suggestions:
-        suggestions.append({
-            'level': 'info',
-            'message': '路段状态正常，按计划开放。',
-            'action': 'open'
-        })
-
-    return suggestions
-
-
-def open_schedule_list(request):
-    road_filter = request.GET.get('road')
-    season_filter = request.GET.get('season')
-    weather_filter = request.GET.get('weather')
-    maintenance_filter = request.GET.get('maintenance')
-
-    schedules = OpenSchedule.objects.select_related('road_section').all()
-
-    if road_filter:
-        schedules = schedules.filter(road_section_id=road_filter)
-    if season_filter:
-        schedules = schedules.filter(season=season_filter)
-    if weather_filter:
-        schedules = schedules.filter(weather_condition=weather_filter)
-    if maintenance_filter:
-        schedules = schedules.filter(maintenance_status=maintenance_filter)
-
-    schedules = schedules.order_by('road_section__code', 'season')
-    roads = RoadSection.objects.all()
-
-    stats = {
-        'total': schedules.count(),
-        'active': schedules.filter(is_active=True).count(),
-        'inactive': schedules.filter(is_active=False).count(),
-    }
-
-    return render(request, 'roads/open_schedule_list.html', {
-        'schedules': schedules,
-        'roads': roads,
-        'road_filter': road_filter,
-        'season_filter': season_filter,
-        'weather_filter': weather_filter,
-        'maintenance_filter': maintenance_filter,
-        'season_choices': dict(SEASON_CHOICES),
-        'weather_choices': dict(WEATHER_CONDITION_CHOICES),
-        'maintenance_choices': dict(MAINTENANCE_STATUS_CHOICES),
-        'stats': stats,
-    })
-
-
-def open_schedule_create(request):
-    initial = {
-        'season': _get_current_season(),
-        'time_slot_minutes': 60,
-    }
-    road_id = request.GET.get('road')
-    if road_id:
-        initial['road_section'] = road_id
-
-    if request.method == 'POST':
-        form = OpenScheduleForm(request.POST)
-        if form.is_valid():
-            try:
-                schedule = form.save(commit=False)
-                schedule.full_clean()
-                schedule.save()
-                messages.success(request, '开放计划创建成功。')
-                return redirect('roads:open_schedule_list')
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-    else:
-        form = OpenScheduleForm(initial=initial)
-    return render(request, 'roads/open_schedule_form.html', {
-        'form': form, 'mode': 'create'
-    })
-
-
-def open_schedule_edit(request, pk):
-    schedule = get_object_or_404(OpenSchedule, pk=pk)
-    if request.method == 'POST':
-        form = OpenScheduleForm(request.POST, instance=schedule)
-        if form.is_valid():
-            try:
-                s = form.save(commit=False)
-                s.full_clean()
-                s.save()
-                messages.success(request, '开放计划更新成功。')
-                return redirect('roads:open_schedule_list')
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-    else:
-        form = OpenScheduleForm(instance=schedule)
-    return render(request, 'roads/open_schedule_form.html', {
-        'form': form, 'schedule': schedule, 'mode': 'edit'
-    })
-
-
-def open_schedule_delete(request, pk):
-    schedule = get_object_or_404(OpenSchedule, pk=pk)
-    if request.method == 'POST':
-        schedule.delete()
-        messages.success(request, '开放计划已删除。')
-        return redirect('roads:open_schedule_list')
-    return render(request, 'roads/open_schedule_confirm_delete.html', {
-        'schedule': schedule
-    })
-
-
-def temporary_control_list(request):
-    road_filter = request.GET.get('road')
-    type_filter = request.GET.get('type')
-    status_filter = request.GET.get('status')
-
-    controls = TemporaryControl.objects.select_related('road_section').all()
-
-    if road_filter:
-        controls = controls.filter(road_section_id=road_filter)
-    if type_filter:
-        controls = controls.filter(control_type=type_filter)
-    if status_filter == 'active':
-        controls = controls.filter(is_active=True)
-    elif status_filter == 'inactive':
-        controls = controls.filter(is_active=False)
-
-    controls = controls.order_by('-start_time')
-    roads = RoadSection.objects.all()
-
-    stats = {
-        'total': controls.count(),
-        'active': controls.filter(is_active=True).count(),
-        'inactive': controls.filter(is_active=False).count(),
-    }
-
-    return render(request, 'roads/temporary_control_list.html', {
-        'controls': controls,
-        'roads': roads,
-        'road_filter': road_filter,
-        'type_filter': type_filter,
-        'status_filter': status_filter,
-        'control_type_choices': dict(CONTROL_TYPE_CHOICES),
-        'open_status_choices': dict(OPEN_STATUS_CHOICES),
-        'stats': stats,
-    })
-
-
-def temporary_control_create(request):
-    initial = {
-        'start_time': timezone.now(),
-        'end_time': timezone.now() + timedelta(hours=24),
-        'issued_by': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else '系统',
-    }
-    road_id = request.GET.get('road')
-    if road_id:
-        initial['road_section'] = road_id
-
-    if request.method == 'POST':
-        form = TemporaryControlForm(request.POST)
-        if form.is_valid():
-            try:
-                control = form.save(commit=False)
-                control.full_clean()
-                control.save()
-                messages.success(request, '临时管制登记成功。')
-                return redirect('roads:temporary_control_list')
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-    else:
-        form = TemporaryControlForm(initial=initial)
-    return render(request, 'roads/temporary_control_form.html', {
-        'form': form, 'mode': 'create'
-    })
-
-
-def temporary_control_edit(request, pk):
-    control = get_object_or_404(TemporaryControl, pk=pk)
-    if request.method == 'POST':
-        form = TemporaryControlForm(request.POST, instance=control)
-        if form.is_valid():
-            try:
-                c = form.save(commit=False)
-                c.full_clean()
-                c.save()
-                messages.success(request, '临时管制更新成功。')
-                return redirect('roads:temporary_control_list')
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-    else:
-        form = TemporaryControlForm(instance=control)
-    return render(request, 'roads/temporary_control_form.html', {
-        'form': form, 'control': control, 'mode': 'edit'
-    })
-
-
-def temporary_control_deactivate(request, pk):
-    control = get_object_or_404(TemporaryControl, pk=pk)
-    if request.method == 'POST':
-        control.deactivate()
-        messages.success(request, '临时管制已解除。')
-    return redirect('roads:temporary_control_list')
-
-
-def temporary_control_delete(request, pk):
-    control = get_object_or_404(TemporaryControl, pk=pk)
-    if request.method == 'POST':
-        control.delete()
-        messages.success(request, '临时管制记录已删除。')
-        return redirect('roads:temporary_control_list')
-    return render(request, 'roads/temporary_control_confirm_delete.html', {
-        'control': control
-    })
-
-
-def visitor_flow_list(request):
-    road_filter = request.GET.get('road')
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    type_filter = request.GET.get('type')
-    weather_filter = request.GET.get('weather')
-
-    flows = VisitorFlowRecord.objects.select_related('road_section').all()
-
-    if road_filter:
-        flows = flows.filter(road_section_id=road_filter)
-    if date_from:
-        try:
-            d = datetime.strptime(date_from, '%Y-%m-%d').date()
-            flows = flows.filter(record_date__gte=d)
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            d = datetime.strptime(date_to, '%Y-%m-%d').date()
-            flows = flows.filter(record_date__lte=d)
-        except ValueError:
-            pass
-    if type_filter:
-        flows = flows.filter(record_type=type_filter)
-    if weather_filter:
-        flows = flows.filter(weather=weather_filter)
-
-    flows = flows.order_by('-record_date', '-record_time')
-    roads = RoadSection.objects.all()
-
-    today = timezone.now().date()
-    today_flows = VisitorFlowRecord.objects.filter(record_date=today)
-    today_total = today_flows.aggregate(total=Count('id'))['total']
-    today_visitors = today_flows.aggregate(
-        total=Count('visitor_count')
-    )['total'] if today_flows.exists() else 0
-
-    latest_occupancy = {}
-    for road in roads:
-        latest = VisitorFlowRecord.objects.filter(
-            road_section=road
-        ).order_by('-record_date', '-record_time').first()
-        if latest:
-            latest_occupancy[road.pk] = latest.current_occupancy
-
-    stats = {
-        'total_records': flows.count(),
-        'today_records': today_total,
-        'today_visitors': today_visitors,
-    }
-
-    return render(request, 'roads/visitor_flow_list.html', {
-        'flows': flows,
-        'roads': roads,
-        'road_filter': road_filter,
-        'date_from': date_from,
-        'date_to': date_to,
-        'type_filter': type_filter,
-        'weather_filter': weather_filter,
-        'flow_type_choices': dict(FLOW_RECORD_TYPE_CHOICES),
-        'weather_choices': dict(WEATHER_CONDITION_CHOICES),
-        'stats': stats,
-        'latest_occupancy': latest_occupancy,
-    })
-
-
-def visitor_flow_create(request):
-    now = timezone.now()
-    initial = {
-        'record_date': now.date(),
-        'record_time': now.time().replace(microsecond=0),
-        'recorded_by': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else '系统',
-    }
-    road_id = request.GET.get('road')
-    if road_id:
-        initial['road_section'] = road_id
-
-    if request.method == 'POST':
-        form = VisitorFlowRecordForm(request.POST)
-        if form.is_valid():
-            try:
-                flow = form.save(commit=False)
-                flow.full_clean()
-                flow.save()
-                messages.success(request, '客流记录登记成功。')
-                return redirect('roads:visitor_flow_list')
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-    else:
-        form = VisitorFlowRecordForm(initial=initial)
-    return render(request, 'roads/visitor_flow_form.html', {
-        'form': form, 'mode': 'create'
-    })
-
-
-def visitor_flow_edit(request, pk):
-    flow = get_object_or_404(VisitorFlowRecord, pk=pk)
-    if request.method == 'POST':
-        form = VisitorFlowRecordForm(request.POST, instance=flow)
-        if form.is_valid():
-            try:
-                f = form.save(commit=False)
-                f.full_clean()
-                f.save()
-                messages.success(request, '客流记录更新成功。')
-                return redirect('roads:visitor_flow_list')
-            except ValidationError as e:
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-    else:
-        form = VisitorFlowRecordForm(instance=flow)
-    return render(request, 'roads/visitor_flow_form.html', {
-        'form': form, 'flow': flow, 'mode': 'edit'
-    })
-
-
-def visitor_flow_delete(request, pk):
-    flow = get_object_or_404(VisitorFlowRecord, pk=pk)
-    if request.method == 'POST':
-        flow.delete()
-        messages.success(request, '客流记录已删除。')
-        return redirect('roads:visitor_flow_list')
-    return render(request, 'roads/visitor_flow_confirm_delete.html', {
-        'flow': flow
-    })
-
-
-def open_status_dashboard(request):
-    roads = RoadSection.objects.all()
-    now = timezone.now()
-
-    road_statuses = []
-    for road in roads:
-        schedule = OpenSchedule.objects.filter(
-            road_section=road, is_active=True
-        ).first()
-        active_controls = TemporaryControl.objects.filter(
-            road_section=road, is_active=True,
-            start_time__lte=now, end_time__gte=now
-        )
-        passage = RoadPassageStatus.objects.filter(
-            road_section=road
-        ).first()
-        latest_flow = VisitorFlowRecord.objects.filter(
-            road_section=road
-        ).order_by('-record_date', '-record_time').first()
-        suggestions = _generate_open_suggestion(road)
-
-        current_status = 'closed'
-        if schedule:
-            current_status = schedule.get_current_open_status()
-        if active_controls.exists():
-            current_status = active_controls.first().open_status
-
-        capacity_usage = 0
-        max_capacity = 0
-        if schedule:
-            max_capacity = schedule.max_capacity
-        if latest_flow and max_capacity > 0:
-            capacity_usage = round(latest_flow.current_occupancy / max_capacity * 100, 1)
-
-        road_statuses.append({
-            'road': road,
-            'schedule': schedule,
-            'active_controls': active_controls,
-            'passage': passage,
-            'latest_flow': latest_flow,
-            'suggestions': suggestions,
-            'current_status': current_status,
-            'current_status_display': dict(OPEN_STATUS_CHOICES).get(current_status, current_status),
-            'capacity_usage': capacity_usage,
-            'max_capacity': max_capacity,
-        })
-
-    total_open = sum(1 for rs in road_statuses if rs['current_status'] == 'open')
-    total_partial = sum(1 for rs in road_statuses if rs['current_status'] == 'partial')
-    total_restricted = sum(1 for rs in road_statuses if rs['current_status'] == 'restricted')
-    total_closed = sum(1 for rs in road_statuses if rs['current_status'] == 'closed')
-
-    stats = {
-        'total_roads': len(road_statuses),
-        'open': total_open,
-        'partial': total_partial,
-        'restricted': total_restricted,
-        'closed': total_closed,
-        'with_suggestions': sum(1 for rs in road_statuses if any(s['level'] != 'info' for s in rs['suggestions'])),
-    }
-
-    return render(request, 'roads/open_status_dashboard.html', {
-        'road_statuses': road_statuses,
-        'stats': stats,
-        'open_status_choices': dict(OPEN_STATUS_CHOICES),
-        'control_type_choices': dict(CONTROL_TYPE_CHOICES),
-        'season_choices': dict(SEASON_CHOICES),
-        'weather_choices': dict(WEATHER_CONDITION_CHOICES),
-    })
-
-
-def api_open_suggestion(request, road_pk):
-    road = get_object_or_404(RoadSection, pk=road_pk)
-    suggestions = _generate_open_suggestion(road)
-    schedule = OpenSchedule.objects.filter(
-        road_section=road, is_active=True
-    ).first()
-
-    effective_capacity = schedule.max_capacity if schedule else 0
-    effective_open = str(schedule.open_time) if schedule else ''
-    effective_close = str(schedule.close_time) if schedule else ''
-
-    active_controls = TemporaryControl.objects.filter(
-        road_section=road, is_active=True,
-        start_time__lte=timezone.now(), end_time__gte=timezone.now()
-    )
-    if active_controls.exists():
-        ctrl = active_controls.first()
-        if ctrl.adjusted_capacity:
-            effective_capacity = ctrl.adjusted_capacity
-        if ctrl.adjusted_open_time:
-            effective_open = str(ctrl.adjusted_open_time)
-        if ctrl.adjusted_close_time:
-            effective_close = str(ctrl.adjusted_close_time)
-
-    return JsonResponse({
-        'road_id': road.pk,
-        'road_code': road.code,
-        'road_name': road.name,
-        'suggestions': suggestions,
-        'effective_capacity': effective_capacity,
-        'effective_open_time': effective_open,
-        'effective_close_time': effective_close,
     })

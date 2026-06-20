@@ -170,7 +170,6 @@
                         <span class="info-label">所属路段</span>
                         <span class="info-value">{{ task.point.road_section.name }}</span>
                     </div>
-                    {% if task.inspection %}
                     <div class="info-row">
                         <span class="info-label">关联巡查记录</span>
                         <span class="info-value">
@@ -180,19 +179,6 @@
                             </a>
                         </span>
                     </div>
-                    {% endif %}
-                    {% if task.hazard %}
-                    <div class="info-row">
-                        <span class="info-label">关联灾害隐患</span>
-                        <span class="info-value">
-                            <a href="{% url 'roads:hazard_detail' task.hazard.pk %}">
-                                <code>{{ task.hazard.code }}</code> -
-                                <span class="badge badge-hazard-{{ task.hazard.hazard_level }}">{{ task.hazard.get_hazard_level_display }}</span>
-                            </a>
-                            <br><small class="text-muted">{{ task.hazard.get_hazard_type_display }}</small>
-                        </span>
-                    </div>
-                    {% endif %}
                 </div>
 
                 {% if task.rectification_result %}

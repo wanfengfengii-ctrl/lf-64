@@ -299,45 +299,40 @@ document.addEventListener('DOMContentLoaded', function() {
                          props.wear_level === 2 ? '#ffc107' :
                          props.wear_level === 3 ? '#fd7e14' :
                          props.wear_level === 4 ? '#dc3545' : '#6c757d';
-        const riskBadge = props.is_high_risk
-            ? `<span style="float:right;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#dc3545;color:#fff;">⚠ 高风险</span>`
-            : `<span style="float:right;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#28a745;color:#fff;">正常</span>`;
         return `
-            <h6 style="margin:0 0 10px 0;font-size:14px;border-bottom:1px solid #eee;padding-bottom:8px;">
-                <span style="display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;">
-                    ${props.code} · ${props.name}
-                </span>
-                ${riskBadge}
+            <h6 style="margin:0 0 8px 0;font-size:14px;border-bottom:1px solid #eee;padding-bottom:6px;">
+                ${props.code} - ${props.name}
             </h6>
-            <div style="background:${wearColor}14;border:1px solid ${wearColor}33;border-radius:6px;padding:8px 10px;margin-bottom:8px;">
-                <div style="font-size:11px;color:#888;margin-bottom:3px;">当前未处理最严重磨损</div>
-                <div style="font-size:18px;font-weight:700;color:${wearColor};line-height:1.2;">
-                    ${props.handled ? '✓ 全部已处理' : props.wear_level_display}
-                </div>
-            </div>
             <div class="popup-row">
-                <span class="popup-label">点位类型</span>
+                <span class="popup-label">类型</span>
                 <span>${props.point_type_display}</span>
             </div>
             <div class="popup-row">
-                <span class="popup-label">所属路段</span>
+                <span class="popup-label">路段</span>
                 <span>${props.road_section}</span>
             </div>
-            ${props.has_latest ? `
-            <div style="border-top:1px dashed #eee;margin:6px 0;padding-top:6px;">
+            <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
                 <div class="popup-row">
-                    <span class="popup-label">最近一次巡查</span>
-                    <span style="font-size:12px;color:#666;">${props.latest_wear_display}</span>
+                    <span class="popup-label"><strong>未处理最严重</strong></span>
+                    <span style="color:${wearColor};font-weight:600;">${props.wear_level_display}</span>
                 </div>
-                <div style="font-size:10px;color:#aaa;margin-top:2px;">
-                    * 若最新巡查已处理过旧磨损，以最新为准；若仍有历史未处理，以最严重为准
+                <div class="popup-row">
+                    <span class="popup-label">处理状态</span>
+                    <span>${props.handled ? '<span style="color:#28a745;">全部已处理</span>' : '<span style="color:#dc3545;">存在未处理</span>'}</span>
+                </div>
+            </div>
+            ${props.has_latest ? `
+            <div style="border-top:1px solid #eee;margin:6px 0;padding-top:6px;">
+                <div class="popup-row">
+                    <span class="popup-label">最新巡查结果</span>
+                    <span>${props.latest_wear_display}</span>
                 </div>
             </div>
             ` : ''}
             <div style="border-top:1px solid #eee;margin-top:8px;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
-                <a href="/points/${props.id}/" class="btn btn-sm btn-outline-primary w-100">查看点位详情</a>
+                <a href="/points/${props.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
                 <a href="{% url 'roads:charts' %}?point=${props.id}" class="btn btn-sm btn-outline-info w-100">查看磨损演变</a>
-                ${!props.handled ? `<a href="{% url 'roads:task_create' %}?point=${props.id}" class="btn btn-sm btn-outline-danger w-100">创建整改工单</a>` : ''}
+                <a href="{% url 'roads:task_create' %}?point=${props.id}" class="btn btn-sm btn-outline-danger w-100">创建工单</a>
             </div>
         `;
     }

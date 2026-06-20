@@ -159,7 +159,7 @@
             <select id="filter-road" class="form-select form-select-sm">
                 <option value="">全部路段</option>
                 {% for road in roads %}
-                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"%s" %}selected{% endif %}>{{ road.code }}</option>
+                <option value="{{ road.pk }}" {% if road_filter == road.pk|stringformat:"s" %}selected{% endif %}>{{ road.code }}</option>
                 {% endfor %}
             </select>
         </div>

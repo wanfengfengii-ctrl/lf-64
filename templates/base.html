@@ -64,17 +64,6 @@
                             <li><a class="dropdown-item" href="{% url 'roads:passage_status_list' %}">通行状态</a></li>
                         </ul>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            游客承载
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'roads:open_status_dashboard' %}">开放状态总览</a></li>
-                            <li><a class="dropdown-item" href="{% url 'roads:open_schedule_list' %}">开放时段计划</a></li>
-                            <li><a class="dropdown-item" href="{% url 'roads:temporary_control_list' %}">临时管制</a></li>
-                            <li><a class="dropdown-item" href="{% url 'roads:visitor_flow_list' %}">客流记录</a></li>
-                        </ul>
-                    </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'export' %}active{% endif %}" href="{% url 'roads:export' %}">数据导出</a>
                     </li>

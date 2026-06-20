@@ -2,7 +2,6 @@ from django.contrib import admin
 from .models import (
     RoadSection, Point, InspectionRecord, Photo, Alert, TaskOrder,
     Hazard, HazardDisposal, RoadPassageStatus,
-    OpenSchedule, TemporaryControl, VisitorFlowRecord,
 )
 
 
@@ -107,30 +106,3 @@ class RoadPassageStatusAdmin(admin.ModelAdmin):
     list_filter = ['passage_status']
     search_fields = ['road_section__code', 'road_section__name', 'status_reason']
     readonly_fields = ['effective_from', 'updated_at']
-
-
-@admin.register(OpenSchedule)
-class OpenScheduleAdmin(admin.ModelAdmin):
-    list_display = ['road_section', 'season', 'weather_condition', 'maintenance_status',
-                    'open_time', 'close_time', 'max_capacity', 'slot_max_capacity', 'is_active']
-    list_filter = ['season', 'weather_condition', 'maintenance_status', 'is_active']
-    search_fields = ['road_section__code', 'road_section__name']
-    readonly_fields = ['created_at', 'updated_at']
-
-
-@admin.register(TemporaryControl)
-class TemporaryControlAdmin(admin.ModelAdmin):
-    list_display = ['road_section', 'control_type', 'open_status', 'start_time',
-                    'end_time', 'adjusted_capacity', 'is_active', 'issued_by']
-    list_filter = ['control_type', 'open_status', 'is_active']
-    search_fields = ['road_section__code', 'road_section__name', 'reason']
-    readonly_fields = ['created_at', 'updated_at']
-
-
-@admin.register(VisitorFlowRecord)
-class VisitorFlowRecordAdmin(admin.ModelAdmin):
-    list_display = ['road_section', 'record_date', 'record_time', 'record_type',
-                    'visitor_count', 'current_occupancy', 'weather', 'recorded_by']
-    list_filter = ['record_type', 'weather', 'record_date']
-    search_fields = ['road_section__code', 'road_section__name']
-    readonly_fields = ['created_at']

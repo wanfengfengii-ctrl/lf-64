@@ -57,31 +57,12 @@ urlpatterns = [
     path('hazards/<int:pk>/assess/', views.hazard_assess, name='hazard_assess'),
     path('hazards/<int:pk>/dispose/', views.hazard_dispose, name='hazard_dispose'),
     path('hazards/<int:pk>/close/', views.hazard_close, name='hazard_close'),
-    path('hazards/<int:pk>/task/', views.hazard_task_create, name='hazard_task_create'),
     path('hazards/<int:pk>/status/', views.hazard_update_status, name='hazard_update_status'),
     path('hazard-map/', views.hazard_map, name='hazard_map'),
 
     path('passage-status/', views.passage_status_list, name='passage_status_list'),
     path('passage-status/<int:pk>/edit/', views.passage_status_edit, name='passage_status_edit'),
     path('passage-status/<int:pk>/recalc/', views.passage_status_recalc, name='passage_status_recalc'),
-
-    path('open-schedule/', views.open_schedule_list, name='open_schedule_list'),
-    path('open-schedule/create/', views.open_schedule_create, name='open_schedule_create'),
-    path('open-schedule/<int:pk>/edit/', views.open_schedule_edit, name='open_schedule_edit'),
-    path('open-schedule/<int:pk>/delete/', views.open_schedule_delete, name='open_schedule_delete'),
-
-    path('temporary-control/', views.temporary_control_list, name='temporary_control_list'),
-    path('temporary-control/create/', views.temporary_control_create, name='temporary_control_create'),
-    path('temporary-control/<int:pk>/edit/', views.temporary_control_edit, name='temporary_control_edit'),
-    path('temporary-control/<int:pk>/deactivate/', views.temporary_control_deactivate, name='temporary_control_deactivate'),
-    path('temporary-control/<int:pk>/delete/', views.temporary_control_delete, name='temporary_control_delete'),
-
-    path('visitor-flow/', views.visitor_flow_list, name='visitor_flow_list'),
-    path('visitor-flow/create/', views.visitor_flow_create, name='visitor_flow_create'),
-    path('visitor-flow/<int:pk>/edit/', views.visitor_flow_edit, name='visitor_flow_edit'),
-    path('visitor-flow/<int:pk>/delete/', views.visitor_flow_delete, name='visitor_flow_delete'),
-
-    path('open-status/', views.open_status_dashboard, name='open_status_dashboard'),
 
     path('api/wear-data/', views.api_wear_data, name='api_wear_data'),
     path('api/points-geo/', views.api_points_geo, name='api_points_geo'),
@@ -90,5 +71,4 @@ urlpatterns = [
     path('api/hazards-geo/', views.api_hazards_geo, name='api_hazards_geo'),
     path('api/roads-passage-status/', views.api_roads_passage_status, name='api_roads_passage_status'),
     path('api/hazard-summary/', views.api_hazard_summary, name='api_hazard_summary'),
-    path('api/open-suggestion/<int:road_pk>/', views.api_open_suggestion, name='api_open_suggestion'),
 ]
