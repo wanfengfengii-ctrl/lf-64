@@ -233,6 +233,13 @@ class HazardForm(forms.ModelForm):
         self.fields['inspection_source'].required = False
         self.fields['latitude'].required = False
         self.fields['longitude'].required = False
+        self.fields['hazard_level'].required = False
+        self.fields['control_suggestion'].required = False
+        self.fields['passage_status'].required = False
+        self.fields['affected_length_m'].required = False
+        self.fields['description'].required = False
+        self.fields['location_desc'].required = False
+        self.fields['casualty_info'].required = False
 
 
 class HazardAssessForm(forms.ModelForm):

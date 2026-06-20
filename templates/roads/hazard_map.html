@@ -368,8 +368,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div style="font-size:12px;color:#555;">${p.description}</div>
             </div>` : ''}
             <div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;display:flex;flex-direction:column;gap:5px;">
-                <a href="{% url 'roads:hazard_list' %}${p.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
-                <a href="{% url 'roads:hazard_list' %}${p.id}/dispose/" class="btn btn-sm btn-outline-warning w-100">进行处置</a>
+                <a href="/hazards/${p.id}/" class="btn btn-sm btn-outline-primary w-100">查看详情</a>
+                <a href="/hazards/${p.id}/dispose/" class="btn btn-sm btn-outline-warning w-100">进行处置</a>
             </div>
         `;
     }

@@ -58,7 +58,7 @@ urlpatterns = [
     path('hazards/<int:pk>/dispose/', views.hazard_dispose, name='hazard_dispose'),
     path('hazards/<int:pk>/close/', views.hazard_close, name='hazard_close'),
     path('hazards/<int:pk>/status/', views.hazard_update_status, name='hazard_update_status'),
-    path('hazard-map/', views.hazard_map, name='hazard_map'),
+    path('hazards/hazard-map/', views.hazard_map, name='hazard_map'),
 
     path('passage-status/', views.passage_status_list, name='passage_status_list'),
     path('passage-status/<int:pk>/edit/', views.passage_status_edit, name='passage_status_edit'),
