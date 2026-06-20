@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
 from django.db.models import Count, Avg, Q, Max, Min, F, Exists, OuterRef
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -109,6 +110,35 @@ def dashboard(request):
     for item in task_status_stats:
         task_stats_dict[item['status']] = item['count']
 
+    total_hazards = Hazard.objects.count()
+    active_hazards = Hazard.objects.exclude(status__in=['resolved', 'closed'])
+    critical_hazards = active_hazards.filter(hazard_level='critical').count()
+    severe_hazards = active_hazards.filter(hazard_level='severe').count()
+    warning_hazards = active_hazards.filter(hazard_level='warning').count()
+    disposing_hazards = active_hazards.filter(status='disposing').count()
+    overdue_hazards = active_hazards.filter(disposal_deadline__lt=timezone.now().date()).count()
+    roads_with_hazards = RoadSection.objects.annotate(
+        hazard_count=Count('hazards', filter=~Q(hazards__status__in=['resolved', 'closed']), distinct=True)
+    ).filter(hazard_count__gt=0).order_by('-hazard_count')[:5]
+
+    recent_hazards = Hazard.objects.select_related(
+        'road_section', 'point'
+    ).prefetch_related('disposals').order_by('-reported_at')[:8]
+
+    hazard_level_distribution = active_hazards.values('hazard_level').annotate(
+        count=Count('id')
+    ).order_by('hazard_level')
+    hazard_level_dict = {level: 0 for level, _ in HAZARD_LEVEL_CHOICES if level != 'safe'}
+    for item in hazard_level_distribution:
+        hazard_level_dict[item['hazard_level']] = item['count']
+
+    passage_status_stats = RoadPassageStatus.objects.values('passage_status').annotate(
+        count=Count('id')
+    )
+    passage_stats_dict = {s: 0 for s, _ in PASSAGE_STATUS_CHOICES}
+    for item in passage_status_stats:
+        passage_stats_dict[item['passage_status']] = item['count']
+
     return render(request, 'roads/dashboard.html', {
         'total_roads': total_roads,
         'total_points': total_points,
@@ -127,6 +157,20 @@ def dashboard(request):
         'wear_stats_list': wear_stats_list,
         'task_stats_dict': task_stats_dict,
         'task_status_choices': dict(TASK_STATUS_CHOICES),
+        'total_hazards': total_hazards,
+        'active_hazards_count': active_hazards.count(),
+        'critical_hazards': critical_hazards,
+        'severe_hazards': severe_hazards,
+        'warning_hazards': warning_hazards,
+        'disposing_hazards': disposing_hazards,
+        'overdue_hazards': overdue_hazards,
+        'recent_hazards': recent_hazards,
+        'hazard_level_dict': hazard_level_dict,
+        'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
+        'hazard_status_choices': dict(HAZARD_STATUS_CHOICES),
+        'roads_with_hazards': roads_with_hazards,
+        'passage_stats_dict': passage_stats_dict,
+        'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
     })
 
 
@@ -235,6 +279,37 @@ def charts_view(request):
             ).count()
             wear_count_data[level][idx] = count
 
+    hazard_level_count = defaultdict(lambda: [0] * len(labels))
+    hazard_total = [0] * len(labels)
+    hazard_critical_severe = [0] * len(labels)
+
+    for i in range(months_count - 1, -1, -1):
+        idx = months_count - 1 - i
+        if today.month - i <= 0:
+            year = today.year - 1
+            month = today.month - i + 12
+        else:
+            year = today.year
+            month = today.month - i
+
+        month_hazards = Hazard.objects.filter(
+            reported_date__year=year,
+            reported_date__month=month
+        )
+        total = month_hazards.count()
+        hazard_total[idx] = total
+
+        critical_severe = month_hazards.filter(
+            hazard_level__in=['critical', 'severe']
+        ).count()
+        hazard_critical_severe[idx] = critical_severe
+
+        for level, _ in HAZARD_LEVEL_CHOICES:
+            if level == 'safe':
+                continue
+            count = month_hazards.filter(hazard_level=level).count()
+            hazard_level_count[level][idx] = count
+
     return render(request, 'roads/charts.html', {
         'roads': roads,
         'points': points,
@@ -245,6 +320,10 @@ def charts_view(request):
         'road_data': road_data,
         'wear_level_choices': dict(WEAR_LEVEL_CHOICES),
         'wear_count_data': dict(wear_count_data),
+        'hazard_level_count': dict(hazard_level_count),
+        'hazard_total': hazard_total,
+        'hazard_critical_severe': hazard_critical_severe,
+        'hazard_level_choices': {k: v for k, v in HAZARD_LEVEL_CHOICES if k != 'safe'},
     })
 
 
@@ -1115,7 +1194,12 @@ def priority_list(request):
         'point', 'point__road_section'
     ).order_by('-wear_level', 'inspection_date')
 
+    active_hazards = Hazard.objects.filter(
+        status__in=['reported', 'assessing', 'disposing', 'monitoring']
+    ).select_related('point', 'point__road_section').order_by('-reported_at')
+
     priority_items = []
+
     for insp in unhandled:
         days_pending = (timezone.now().date() - insp.inspection_date).days
         priority_score = insp.wear_level * 100 + days_pending
@@ -1135,15 +1219,68 @@ def priority_list(request):
 
         has_task = TaskOrder.objects.filter(
             inspection=insp
-        ).exclude(status='closed').exists()
+        ).exclude(status='closed').first()
 
         priority_items.append({
+            'type': 'wear',
+            'type_label': '磨损养护',
+            'type_badge': 'bg-primary',
             'inspection': insp,
             'priority': priority,
             'priority_class': priority_class,
             'priority_score': priority_score,
             'days_pending': days_pending,
             'has_task': has_task,
+            'point': insp.point,
+            'road_section': insp.point.road_section,
+            'description': insp.maintenance_suggestion or '定期巡查维护',
+            'detail_url': reverse('roads:inspection_detail', args=[insp.pk]),
+            'task_create_url': reverse('roads:task_create_from_insp', args=[insp.pk]),
+        })
+
+    hazard_level_score = {
+        'critical': 500,
+        'severe': 400,
+        'warning': 300,
+        'info': 200,
+        'safe': 100,
+    }
+    hazard_priority_map = {
+        'critical': ('紧急', 'danger'),
+        'severe': ('高', 'warning'),
+        'warning': ('中', 'info'),
+        'info': ('低', 'secondary'),
+        'safe': ('低', 'secondary'),
+    }
+
+    for hazard in active_hazards:
+        days_pending = (timezone.now().date() - hazard.reported_at.date()).days
+        level_score = hazard_level_score.get(hazard.hazard_level, 100)
+        priority_score = level_score + days_pending
+
+        priority, priority_class = hazard_priority_map.get(
+            hazard.hazard_level, ('低', 'secondary')
+        )
+
+        has_task = TaskOrder.objects.filter(
+            hazard=hazard
+        ).exclude(status='closed').first()
+
+        priority_items.append({
+            'type': 'hazard',
+            'type_label': '灾害隐患',
+            'type_badge': 'bg-danger',
+            'hazard': hazard,
+            'priority': priority,
+            'priority_class': priority_class,
+            'priority_score': priority_score,
+            'days_pending': days_pending,
+            'has_task': has_task,
+            'point': hazard.point,
+            'road_section': hazard.point.road_section,
+            'description': hazard.description or hazard.get_hazard_type_display(),
+            'detail_url': reverse('roads:hazard_detail', args=[hazard.pk]),
+            'task_create_url': reverse('roads:hazard_task_create', args=[hazard.pk]),
         })
 
     priority_items.sort(key=lambda x: x['priority_score'], reverse=True)
@@ -1155,6 +1292,8 @@ def priority_list(request):
         'low': sum(1 for p in priority_items if p['priority'] == '低'),
         'with_task': sum(1 for p in priority_items if p['has_task']),
         'total': len(priority_items),
+        'wear_count': sum(1 for p in priority_items if p['type'] == 'wear'),
+        'hazard_count': sum(1 for p in priority_items if p['type'] == 'hazard'),
     }
     stats['without_task'] = stats['total'] - stats['with_task']
 
@@ -1459,13 +1598,15 @@ def hazard_detail(request, pk):
     hazard = get_object_or_404(
         Hazard.objects.select_related(
             'road_section', 'point', 'inspection_source'
-        ).prefetch_related('disposals', 'disposals__related_task'),
+        ).prefetch_related('disposals', 'disposals__related_task', 'task_orders'),
         pk=pk
     )
     disposals = hazard.disposals.all().order_by('-disposed_at')
+    task_orders = hazard.task_orders.all().order_by('-created_at')
     return render(request, 'roads/hazard_detail.html', {
         'hazard': hazard,
         'disposals': disposals,
+        'task_orders': task_orders,
         'hazard_level_choices': dict(HAZARD_LEVEL_CHOICES),
         'hazard_type_choices': dict(HAZARD_TYPE_CHOICES),
         'location_type_choices': dict(HAZARD_LOCATION_TYPE_CHOICES),
@@ -1473,6 +1614,7 @@ def hazard_detail(request, pk):
         'passage_status_choices': dict(PASSAGE_STATUS_CHOICES),
         'control_choices': dict(CONTROL_SUGGESTION_CHOICES),
         'disposal_type_choices': dict(DISPOSAL_TYPE_CHOICES),
+        'task_status_choices': dict(TASK_STATUS_CHOICES),
     })
 
 
@@ -1641,6 +1783,67 @@ def hazard_delete(request, pk):
         messages.success(request, '隐患记录已删除。')
         return redirect('roads:hazard_list')
     return render(request, 'roads/hazard_confirm_delete.html', {'hazard': hazard})
+
+
+def hazard_task_create(request, pk):
+    hazard = get_object_or_404(Hazard, pk=pk)
+
+    level_priority_map = {
+        'critical': 'urgent',
+        'severe': 'urgent',
+        'warning': 'high',
+        'info': 'medium',
+        'safe': 'low',
+    }
+    priority = level_priority_map.get(hazard.hazard_level, 'high')
+
+    initial = {
+        'hazard': hazard,
+        'title': f'{hazard.code} - {hazard.title} 应急处置',
+        'description': f'隐患编号：{hazard.code}\n隐患类型：{hazard.get_hazard_type_display()}\n预警等级：{hazard.get_hazard_level_display()}\n\n隐患描述：\n{hazard.description}\n\n封控建议：{hazard.get_control_suggestion_display()}',
+        'priority': priority,
+    }
+    if hazard.point:
+        initial['point'] = hazard.point
+    if hazard.disposal_deadline:
+        initial['deadline'] = hazard.disposal_deadline
+    else:
+        days_map = {'critical': 1, 'severe': 3, 'warning': 7, 'info': 14, 'safe': 30}
+        initial['deadline'] = timezone.now().date() + timedelta(days=days_map.get(hazard.hazard_level, 7))
+
+    if request.method == 'POST':
+        form = TaskOrderForm(request.POST)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.hazard = hazard
+            task.status = 'dispatched'
+            task.dispatched_at = timezone.now()
+            task.save()
+
+            disposal = HazardDisposal.objects.create(
+                hazard=hazard,
+                disposal_type='dispatch',
+                status_before=hazard.status,
+                status_after='disposing' if hazard.status in ['reported', 'assessing'] else hazard.status,
+                level_before=hazard.hazard_level,
+                passage_before=hazard.passage_status,
+                description=f'派发应急处置工单：{task.title}\n指派人员：{task.assigned_to or "待指派"}\n整改期限：{task.deadline or "未设定"}',
+                disposed_by=request.user.username if request.user.is_authenticated else '系统',
+                related_task=task,
+            )
+
+            if hazard.status in ['reported', 'assessing']:
+                hazard.status = 'disposing'
+                hazard.save()
+
+            messages.success(request, f'应急工单已创建并派发：{task.title}')
+            return redirect('roads:hazard_detail', pk=pk)
+    else:
+        form = TaskOrderForm(initial=initial)
+    return render(request, 'roads/hazard_task_create.html', {
+        'form': form,
+        'hazard': hazard,
+    })
 
 
 # ==================== 通行状态管理 ====================

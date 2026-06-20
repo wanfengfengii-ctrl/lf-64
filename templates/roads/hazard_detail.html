@@ -44,7 +44,10 @@
                     <a href="{% url 'roads:hazard_assess' hazard.pk %}" class="btn btn-sm btn-info">等级评估</a>
                     {% endif %}
                     {% if hazard.status not in 'resolved,closed' %}
-                    <a href="{% url 'roads:hazard_dispose' hazard.pk %}" class="btn btn-sm btn-warning">处置操作</a>
+                    <a href="{% url 'roads:hazard_task_create' hazard.pk %}" class="btn btn-sm btn-warning">派发工单</a>
+                    {% endif %}
+                    {% if hazard.status not in 'resolved,closed' %}
+                    <a href="{% url 'roads:hazard_dispose' hazard.pk %}" class="btn btn-sm btn-primary">处置操作</a>
                     {% endif %}
                     {% if hazard.status not in 'resolved,closed' %}
                     <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#closeModal">
@@ -346,13 +349,46 @@
                     {% if hazard.road_section %}
                     <a href="{% url 'roads:road_detail' hazard.road_section.pk %}" class="btn btn-sm btn-outline-secondary">查看路段详情</a>
                     {% endif %}
-                    <a href="{% url 'roads:task_create' %}" class="btn btn-sm btn-outline-warning">创建整改工单</a>
+                    {% if hazard.status not in 'resolved,closed' %}
+                    <a href="{% url 'roads:hazard_task_create' hazard.pk %}" class="btn btn-sm btn-outline-warning">派发应急工单</a>
+                    {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                         删除隐患记录
                     </button>
                 </div>
             </div>
         </div>
+
+        {% if task_orders %}
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>📋 关联工单 ({{ task_orders|length }})</span>
+                {% if hazard.status not in 'resolved,closed' %}
+                <a href="{% url 'roads:hazard_task_create' hazard.pk %}" class="btn btn-sm btn-outline-warning">+ 派发</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0" style="max-height:300px;overflow-y:auto;">
+                <div class="list-group list-group-flush">
+                    {% for task in task_orders %}
+                    <a href="{% url 'roads:task_detail' task.pk %}" class="list-group-item list-group-item-action py-2">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div>
+                                <span class="badge badge-task-{{ task.status }} me-1">{{ task.get_status_display }}</span>
+                                <span class="badge badge-priority-{{ task.get_priority_display }} me-1">{{ task.get_priority_display }}</span>
+                            </div>
+                            <small class="text-muted">{{ task.created_at|date:"m-d" }}</small>
+                        </div>
+                        <div class="fw-semibold small">{{ task.title|truncatechars:30 }}</div>
+                        <div class="text-muted small mt-1">
+                            {% if task.assigned_to %}指派: {{ task.assigned_to }}{% else %}<span class="text-warning">未指派</span>{% endif %}
+                            {% if task.deadline %} · 截止: {{ task.deadline|date:"m-d" }}{% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 

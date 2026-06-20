@@ -1,7 +1,14 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import date, timedelta
-from roads.models import RoadSection, Point, InspectionRecord
+from roads.models import (
+    RoadSection, Point, InspectionRecord,
+    Hazard, HazardDisposal, RoadPassageStatus,
+    HAZARD_LOCATION_TYPE_CHOICES, HAZARD_TYPE_CHOICES,
+    HAZARD_LEVEL_CHOICES, HAZARD_STATUS_CHOICES,
+    CONTROL_SUGGESTION_CHOICES, PASSAGE_STATUS_CHOICES,
+    DISPOSAL_TYPE_CHOICES,
+)
 import random
 
 
@@ -141,4 +148,283 @@ class Command(BaseCommand):
             except Exception:
                 pass
 
-        self.stdout.write(self.style.SUCCESS(f'成功创建 {len(roads)} 条路段、{len(points)} 个点位、{total} 条巡查记录'))
+        self.stdout.write('  正在生成灾害隐患示例数据...')
+
+        hazard_templates = [
+            {
+                'title': '边坡塌方隐患',
+                'location_type': 'slope',
+                'hazard_type': 'landslide',
+                'description': '梅关古道北侧边坡出现土壤松动，近期降雨频繁，有小型塌方风险。',
+                'level': 'severe',
+                'status': 'disposing',
+                'control': 'single_lane',
+                'passage': 'restricted',
+                'affected_length': 35,
+            },
+            {
+                'title': '排水沟堵塞积水',
+                'location_type': 'drainage',
+                'hazard_type': 'waterlogging',
+                'description': '接岭桥排水沟因落叶和泥沙淤积导致排水不畅，雨天路面积水严重。',
+                'level': 'warning',
+                'status': 'pending_disposal',
+                'control': 'caution',
+                'passage': 'caution',
+                'affected_length': 20,
+            },
+            {
+                'title': '石阶断裂沉降',
+                'location_type': 'stone_step',
+                'hazard_type': 'subsidence',
+                'description': '猴子岭石阶中段约5米范围出现地基沉降，石阶断裂错位，存在安全隐患。',
+                'level': 'critical',
+                'status': 'assessing',
+                'control': 'full_closure',
+                'passage': 'closed',
+                'affected_length': 15,
+            },
+            {
+                'title': '桥涵底部冲刷',
+                'location_type': 'bridge_culvert',
+                'hazard_type': 'erosion',
+                'description': '接岭桥桥墩底部受水流冲刷，基础部分裸露，需加固处理。',
+                'level': 'severe',
+                'status': 'monitoring',
+                'control': 'speed_limit',
+                'passage': 'restricted',
+                'affected_length': 10,
+            },
+            {
+                'title': '落石风险区',
+                'location_type': 'slope',
+                'hazard_type': 'rockfall',
+                'description': '梯云岭路段东侧边坡岩石风化严重，时有小石块滚落，威胁行人安全。',
+                'level': 'warning',
+                'status': 'reported',
+                'control': 'caution',
+                'passage': 'caution',
+                'affected_length': 50,
+            },
+            {
+                'title': '挡土墙变形',
+                'location_type': 'retaining_wall',
+                'hazard_type': 'deformation',
+                'description': '红豆杉公园段挡土墙出现轻微倾斜和裂缝，需持续监测。',
+                'level': 'warning',
+                'status': 'monitoring',
+                'control': 'caution',
+                'passage': 'caution',
+                'affected_length': 25,
+            },
+            {
+                'title': '涵洞堵塞',
+                'location_type': 'tunnel',
+                'hazard_type': 'blockage',
+                'description': '三寮村段涵洞被淤泥和杂物堵塞，排水能力下降。',
+                'level': 'info',
+                'status': 'resolved',
+                'control': 'none',
+                'passage': 'normal',
+                'affected_length': 8,
+            },
+            {
+                'title': '路面湿滑',
+                'location_type': 'road_surface',
+                'hazard_type': 'slippery',
+                'description': '潮州古城起点附近路段因苔藓生长，雨天路面异常湿滑。',
+                'level': 'warning',
+                'status': 'pending_disposal',
+                'control': 'caution',
+                'passage': 'caution',
+                'affected_length': 30,
+            },
+            {
+                'title': '边坡开裂',
+                'location_type': 'slope',
+                'hazard_type': 'fracture',
+                'description': '高潭镇北侧边坡出现多条纵向裂缝，宽度约2-5厘米，有滑坡风险。',
+                'level': 'critical',
+                'status': 'disposing',
+                'control': 'detour',
+                'passage': 'detour',
+                'affected_length': 40,
+            },
+            {
+                'title': '路面沉降',
+                'location_type': 'road_surface',
+                'hazard_type': 'subsidence',
+                'description': '多祝镇段路面出现不均匀沉降，形成约15厘米的落差。',
+                'level': 'severe',
+                'status': 'reported',
+                'control': 'speed_limit',
+                'passage': 'restricted',
+                'affected_length': 12,
+            },
+        ]
+
+        road_point_map = {
+            0: [0, 4],
+            1: [1, 4, 6, 10],
+            2: [0, 4, 7],
+        }
+
+        hazard_count = 0
+        disposal_count = 0
+        reporters = ['巡查队王队', '养护组李工', '安全监察张工', '村民报告', '游客反馈']
+
+        for idx, tmpl in enumerate(hazard_templates):
+            road_idx = idx % 3
+            road = roads[road_idx]
+            
+            point_indices = road_point_map.get(road_idx, [0])
+            point = points[point_indices[idx % len(point_indices)]] if point_indices else None
+
+            days_ago = random.randint(1, 60)
+            reported_date = today - timedelta(days=days_ago)
+            reported_at = timezone.make_aware(
+                timezone.datetime.combine(reported_date, timezone.datetime.min.time())
+            ) + timedelta(hours=random.randint(6, 18))
+
+            try:
+                hazard = Hazard.objects.create(
+                    road_section=road,
+                    point=point,
+                    title=tmpl['title'],
+                    location_type=tmpl['location_type'],
+                    hazard_type=tmpl['hazard_type'],
+                    hazard_level=tmpl['level'],
+                    status=tmpl['status'],
+                    description=tmpl['description'],
+                    latitude=point.latitude if point else (road.points.first().latitude if road.points.exists() else None),
+                    longitude=point.longitude if point else (road.points.first().longitude if road.points.exists() else None),
+                    location_desc=f'{road.name} {point.name if point else ""}附近',
+                    reported_by=random.choice(reporters),
+                    reported_at=reported_at,
+                    reported_date=reported_date,
+                    control_suggestion=tmpl['control'],
+                    passage_status=tmpl['passage'],
+                    assess_note='经现场勘查，该隐患符合上述等级评定标准。' if tmpl['status'] not in ['reported'] else '',
+                    assessed_by='评估组' if tmpl['status'] not in ['reported'] else '',
+                    assessed_at=reported_at + timedelta(hours=random.randint(2, 24)) if tmpl['status'] not in ['reported'] else None,
+                    disposal_deadline=reported_date + timedelta(days=random.randint(3, 30)) if tmpl['status'] not in ['resolved', 'closed'] else None,
+                    affected_length_m=tmpl['affected_length'],
+                )
+                hazard_count += 1
+
+                if tmpl['status'] != 'reported':
+                    HazardDisposal.objects.create(
+                        hazard=hazard,
+                        disposal_type='reported',
+                        status_before='reported',
+                        status_after=tmpl['status'],
+                        level_before='info',
+                        level_after=tmpl['level'],
+                        passage_before='normal',
+                        passage_after=tmpl['passage'],
+                        description=f'隐患已上报，描述：{tmpl["description"]}',
+                        disposed_by=random.choice(reporters),
+                        disposed_at=reported_at,
+                        is_active=True,
+                    )
+                    disposal_count += 1
+
+                if tmpl['status'] in ['assessing', 'pending_disposal', 'disposing', 'monitoring', 'resolved', 'closed']:
+                    assess_time = reported_at + timedelta(hours=random.randint(3, 48))
+                    HazardDisposal.objects.create(
+                        hazard=hazard,
+                        disposal_type='assessed',
+                        status_before='reported',
+                        status_after='pending_disposal',
+                        level_before='info',
+                        level_after=tmpl['level'],
+                        passage_before='normal',
+                        passage_after=tmpl['passage'],
+                        description=f'完成隐患等级评估，评定为{dict(HAZARD_LEVEL_CHOICES).get(tmpl["level"], "")}。',
+                        disposed_by='评估组',
+                        disposed_at=assess_time,
+                        disposal_result=f'封控建议：{dict(CONTROL_SUGGESTION_CHOICES).get(tmpl["control"], "")}',
+                        next_step='按处置方案开展处置工作',
+                        is_active=True,
+                    )
+                    disposal_count += 1
+
+                if tmpl['status'] in ['disposing', 'monitoring', 'resolved', 'closed']:
+                    dispose_time = assess_time + timedelta(days=random.randint(1, 10))
+                    HazardDisposal.objects.create(
+                        hazard=hazard,
+                        disposal_type='onsite',
+                        status_before='pending_disposal',
+                        status_after='disposing',
+                        level_before=tmpl['level'],
+                        level_after=tmpl['level'],
+                        passage_before=tmpl['passage'],
+                        passage_after=tmpl['passage'],
+                        description='现场处置队伍已进场，开展应急处置工作。',
+                        disposed_by='应急处置组',
+                        disposed_at=dispose_time,
+                        disposal_result='设置警示标志，疏散周边人员',
+                        next_step='继续实施加固/清理工作',
+                        is_active=True,
+                    )
+                    disposal_count += 1
+
+                if tmpl['status'] in ['resolved', 'closed']:
+                    resolve_time = dispose_time + timedelta(days=random.randint(3, 15))
+                    HazardDisposal.objects.create(
+                        hazard=hazard,
+                        disposal_type='inspected',
+                        status_before='disposing',
+                        status_after='resolved',
+                        level_before=tmpl['level'],
+                        level_after='safe',
+                        passage_before=tmpl['passage'],
+                        passage_after='normal',
+                        description='隐患已消除，经复核验收合格。',
+                        disposed_by='复核验收组',
+                        disposed_at=resolve_time,
+                        disposal_result='隐患消除，恢复正常通行',
+                        next_step='纳入日常巡查监测',
+                        is_active=True,
+                    )
+                    disposal_count += 1
+                    hazard.resolved_at = resolve_time
+                    hazard.save()
+
+                if tmpl['status'] == 'closed':
+                    close_time = resolve_time + timedelta(days=random.randint(1, 3))
+                    HazardDisposal.objects.create(
+                        hazard=hazard,
+                        disposal_type='closed',
+                        status_before='resolved',
+                        status_after='closed',
+                        level_before='safe',
+                        level_after='safe',
+                        passage_before='normal',
+                        passage_after='normal',
+                        description='完成闭环归档。',
+                        disposed_by='系统管理员',
+                        disposed_at=close_time,
+                        disposal_result='闭环归档完成',
+                        is_active=True,
+                    )
+                    disposal_count += 1
+                    hazard.closed_at = close_time
+                    hazard.closed_by = '系统管理员'
+                    hazard.save()
+
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f'  创建隐患失败: {e}'))
+                continue
+
+        self.stdout.write('  正在初始化路段通行状态...')
+        for road in roads:
+            RoadPassageStatus.objects.get_or_create(road_section=road)
+
+        for ps in RoadPassageStatus.objects.all():
+            ps.recalculate_from_hazards()
+
+        self.stdout.write(self.style.SUCCESS(
+            f'成功创建 {len(roads)} 条路段、{len(points)} 个点位、{total} 条巡查记录、'
+            f'{hazard_count} 条灾害隐患、{disposal_count} 条处置记录'
+        ))

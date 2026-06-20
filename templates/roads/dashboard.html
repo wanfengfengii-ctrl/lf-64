@@ -33,6 +33,45 @@
 <div class="row mb-4">
     <div class="col-md-2">
         <div class="mini-stat bg-danger text-white">
+            <div class="mini-stat-value">{{ critical_hazards }}</div>
+            <div class="mini-stat-label">紧急隐患</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat" style="background:#fd7e14;color:#fff;">
+            <div class="mini-stat-value">{{ severe_hazards }}</div>
+            <div class="mini-stat-label">严重隐患</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-warning text-white">
+            <div class="mini-stat-value">{{ warning_hazards }}</div>
+            <div class="mini-stat-label">警告隐患</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-info text-white">
+            <div class="mini-stat-value">{{ disposing_hazards }}</div>
+            <div class="mini-stat-label">处置中</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat" style="background:#6c757d;color:#fff;">
+            <div class="mini-stat-value">{{ active_hazards_count }}</div>
+            <div class="mini-stat-label">活跃隐患</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="mini-stat bg-danger text-white">
+            <div class="mini-stat-value">{{ overdue_hazards }}</div>
+            <div class="mini-stat-label">超期隐患</div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="mini-stat bg-danger text-white">
             <div class="mini-stat-value">{{ critical_alerts }}</div>
             <div class="mini-stat-label">紧急预警</div>
         </div>
@@ -160,7 +199,7 @@
 </div>
 
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>最新风险预警</span>
@@ -195,7 +234,44 @@
         </div>
     </div>
 
-    <div class="col-md-6">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>最新灾害隐患</span>
+                <a href="{% url 'roads:hazard_list' %}" class="btn btn-sm btn-outline-primary">全部隐患</a>
+            </div>
+            <div class="card-body" style="max-height: 380px; overflow-y: auto;">
+                {% if recent_hazards %}
+                <div class="list-group list-group-flush">
+                    {% for hazard in recent_hazards %}
+                    <a href="{% url 'roads:hazard_detail' hazard.pk %}" class="list-group-item list-group-item-action {% if hazard.is_overdue %}list-group-item-danger{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div>
+                                <span class="badge badge-hazard-{{ hazard.hazard_level }} me-1">{{ hazard.get_hazard_level_display }}</span>
+                                <span class="fw-semibold">{{ hazard.title|truncatechars:15 }}</span>
+                            </div>
+                            <small class="text-muted">{{ hazard.reported_at|date:"m-d" }}</small>
+                        </div>
+                        <div class="small text-muted">
+                            {% if hazard.road_section %}{{ hazard.road_section.name }}{% endif %}
+                            {% if hazard.point %} · {{ hazard.point.code }}{% endif %}
+                        </div>
+                        <div class="mt-1">
+                            <span class="badge badge-hazard-{{ hazard.status }}">{{ hazard.get_status_display }}</span>
+                            <span class="badge badge-passage-{{ hazard.passage_status }} ms-1">{{ hazard.get_passage_status_display }}</span>
+                            {% if hazard.is_overdue %}<span class="badge bg-danger ms-1">超期</span>{% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-4 mb-0">暂无灾害隐患</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>最新整改工单</span>
@@ -305,7 +381,10 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-body text-center">
-                <a href="{% url 'roads:alert_generate_auto' %}" class="btn btn-danger me-2"
+                <a href="{% url 'roads:hazard_map' %}" class="btn btn-danger me-2">🗺️ 预警地图</a>
+                <a href="{% url 'roads:hazard_list' %}" class="btn btn-outline-danger me-2">⚠️ 灾害隐患</a>
+                <a href="{% url 'roads:passage_status_list' %}" class="btn btn-outline-success me-2">🚦 通行状态</a>
+                <a href="{% url 'roads:alert_generate_auto' %}" class="btn btn-warning me-2"
                    onclick="return confirm('确定要自动扫描并生成预警吗？')">🔍 自动生成风险预警</a>
                 <a href="{% url 'roads:priority_list' %}" class="btn btn-warning me-2">📋 维护优先级清单</a>
                 <a href="{% url 'roads:export' %}" class="btn btn-primary me-2">📤 数据导出</a>

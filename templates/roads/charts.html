@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}统计图表 - 古驿道磨损记录系统{% endblock %}
+{% block title %}趋势分析 - 古驿道巡查养护闭环管理系统{% endblock %}
 
 {% block content %}
 <div class="row mb-3">
@@ -93,6 +93,32 @@
         </div>
     </div>
 </div>
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">灾害隐患月度趋势</div>
+            <div class="card-body">
+                <div class="chart-container" style="position:relative;height:340px;">
+                    <canvas id="hazardTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">各隐患等级月度数量分布</div>
+            <div class="card-body">
+                <div class="chart-container" style="position:relative;height:340px;">
+                    <canvas id="hazardDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -116,6 +142,25 @@ document.addEventListener('DOMContentLoaded', function() {
         '#6f42c1'
     ];
 
+    const distColors = {
+        1: '#28a745',
+        2: '#ffc107',
+        3: '#fd7e14',
+        4: '#dc3545'
+    };
+
+    const hazardColors = {
+        'critical': '#dc3545',
+        'severe': '#fd7e14',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+    };
+
+    const hazardLevelCount = {{ hazard_level_count|safe }};
+    const hazardTotal = {{ hazard_total|safe }};
+    const hazardCriticalSevere = {{ hazard_critical_severe|safe }};
+    const hazardLevelChoices = {{ hazard_level_choices|safe }};
+
     if (selectedPointId) {
         loadPointWearHistory(selectedPointId);
     } else {
@@ -123,6 +168,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     renderDistributionChart(labels, wearCountData, wearLevelChoices);
+    renderHazardTrendChart(labels, hazardTotal, hazardCriticalSevere);
+    renderHazardDistributionChart(labels, hazardLevelCount, hazardLevelChoices);
 
     function renderMonthlyTrendChart(labelList, dataList) {
         const trendDatasets = dataList.map((road, idx) => ({
@@ -325,20 +372,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </table>`;
     }
 
-    const distColors = {
-        1: '#28a745',
-        2: '#ffc107',
-        3: '#fd7e14',
-        4: '#dc3545'
-    };
-
-    const distDatasets = Object.entries(wearCountData).map(([level, data]) => ({
-        label: wearLevelChoices[parseInt(level)],
-        data: data,
-        backgroundColor: distColors[parseInt(level)] || '#6c757d',
-        borderRadius: 4
-    }));
-
     function renderDistributionChart(labelList, countData, choices) {
         const distDatasetsLocal = Object.entries(countData).map(([level, data]) => ({
             label: choices[parseInt(level)],
@@ -367,6 +400,112 @@ document.addEventListener('DOMContentLoaded', function() {
                         title: {
                             display: true,
                             text: '巡查记录数'
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '月份'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderHazardTrendChart(labelList, totalData, criticalSevereData) {
+        new Chart(document.getElementById('hazardTrendChart'), {
+            type: 'line',
+            data: {
+                labels: labelList,
+                datasets: [
+                    {
+                        label: '新增隐患总数',
+                        data: totalData,
+                        borderColor: '#6c757d',
+                        backgroundColor: '#6c757d33',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: '严重及以上隐患',
+                        data: criticalSevereData,
+                        borderColor: '#dc3545',
+                        backgroundColor: '#dc354533',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '隐患数量'
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '月份'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderHazardDistributionChart(labelList, countData, choices) {
+        const datasets = Object.entries(countData).map(([level, data]) => ({
+            label: choices[level] || level,
+            data: data,
+            backgroundColor: hazardColors[level] || '#6c757d',
+            borderRadius: 4
+        }));
+
+        new Chart(document.getElementById('hazardDistributionChart'), {
+            type: 'bar',
+            data: {
+                labels: labelList,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '隐患数量'
                         },
                         ticks: {
                             precision: 0

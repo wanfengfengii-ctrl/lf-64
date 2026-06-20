@@ -57,6 +57,7 @@ urlpatterns = [
     path('hazards/<int:pk>/assess/', views.hazard_assess, name='hazard_assess'),
     path('hazards/<int:pk>/dispose/', views.hazard_dispose, name='hazard_dispose'),
     path('hazards/<int:pk>/close/', views.hazard_close, name='hazard_close'),
+    path('hazards/<int:pk>/task/', views.hazard_task_create, name='hazard_task_create'),
     path('hazards/<int:pk>/status/', views.hazard_update_status, name='hazard_update_status'),
     path('hazard-map/', views.hazard_map, name='hazard_map'),
 

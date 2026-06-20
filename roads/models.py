@@ -383,9 +383,19 @@ class Alert(models.Model):
 class TaskOrder(models.Model):
     inspection = models.ForeignKey(
         InspectionRecord,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='task_orders',
-        verbose_name='关联巡查记录'
+        verbose_name='关联巡查记录',
+        null=True,
+        blank=True
+    )
+    hazard = models.ForeignKey(
+        'Hazard',
+        on_delete=models.SET_NULL,
+        related_name='task_orders',
+        verbose_name='关联灾害隐患',
+        null=True,
+        blank=True
     )
     point = models.ForeignKey(
         Point,
@@ -438,8 +448,13 @@ class TaskOrder(models.Model):
         return False
 
     def get_progress_steps(self):
+        discovery_time = self.created_at
+        if self.inspection:
+            discovery_time = self.inspection.inspection_date
+        elif self.hazard:
+            discovery_time = self.hazard.reported_at
         steps = [
-            {'key': 'discovery', 'label': '发现', 'done': True, 'time': self.inspection.inspection_date},
+            {'key': 'discovery', 'label': '发现', 'done': True, 'time': discovery_time},
             {'key': 'dispatch', 'label': '派单', 'done': self.status != 'pending', 'time': self.dispatched_at},
             {'key': 'rectify', 'label': '整改', 'done': self.status in ['pending_review', 'closed', 'rejected'], 'time': self.rectified_at},
             {'key': 'review', 'label': '复核', 'done': self.status in ['closed', 'rejected'], 'time': self.reviewed_at},
@@ -557,7 +572,22 @@ class Hazard(models.Model):
                 self.longitude = self.point.longitude
 
     def save(self, *args, **kwargs):
+        if not self.code:
+            date_str = timezone.now().strftime('%Y%m%d')
+            count = Hazard.objects.filter(code__startswith=f'HZD{date_str}').count() + 1
+            self.code = f'HZD{date_str}{count:04d}'
+        if not self.reported_date:
+            self.reported_date = timezone.now().date()
+        if self.point and not self.road_section:
+            self.road_section = self.point.road_section
+        if self.point:
+            if self.latitude is None:
+                self.latitude = self.point.latitude
+            if self.longitude is None:
+                self.longitude = self.point.longitude
+
         self.full_clean()
+
         if self.status in ['resolved', 'closed'] and not self.resolved_at:
             self.resolved_at = timezone.now()
         if self.status == 'closed':

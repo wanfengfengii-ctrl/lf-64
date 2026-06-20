@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% load road_extras %}
+
+{% block title %}派发应急工单 - {{ hazard.code }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'roads:dashboard' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_list' %}">灾害隐患</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'roads:hazard_detail' hazard.pk %}">{{ hazard.code }}</a></li>
+        <li class="breadcrumb-item active">派发应急工单</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>派发应急处置工单</h4>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">工单信息</div>
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.title.label }} <span class="text-danger">*</span></label>
+                        {{ form.title }}
+                        {% if form.title.errors %}
+                        <div class="text-danger small">{{ form.title.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.point.label }} <span class="text-danger">*</span></label>
+                                {{ form.point }}
+                                {% if form.point.errors %}
+                                <div class="text-danger small">{{ form.point.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.priority.label }} <span class="text-danger">*</span></label>
+                                {{ form.priority }}
+                                {% if form.priority.errors %}
+                                <div class="text-danger small">{{ form.priority.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.assigned_to.label }}</label>
+                                {{ form.assigned_to }}
+                                {% if form.assigned_to.errors %}
+                                <div class="text-danger small">{{ form.assigned_to.errors|join:", " }}</div>
+                                {% endif %}
+                                <div class="text-muted small">可暂不指派，后续再派发</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.deadline.label }}</label>
+                                {{ form.deadline }}
+                                {% if form.deadline.errors %}
+                                <div class="text-danger small">{{ form.deadline.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="text-danger small">{{ form.description.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{% url 'roads:hazard_detail' hazard.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-danger">创建并派发</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">关联隐患信息</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <span class="badge badge-hazard-{{ hazard.hazard_level }}">{{ hazard.get_hazard_level_display }}</span>
+                    <span class="badge badge-hazard-{{ hazard.status }} ms-1">{{ hazard.get_status_display }}</span>
+                </div>
+                <h6 class="fw-bold">{{ hazard.title }}</h6>
+                <div class="text-muted small mb-2">
+                    编号：{{ hazard.code }}<br>
+                    类型：{{ hazard.get_hazard_type_display }}<br>
+                    上报：{{ hazard.reported_by }} · {{ hazard.reported_at|date:"Y-m-d" }}
+                </div>
+                {% if hazard.road_section %}
+                <div class="text-muted small mb-2">
+                    路段：{{ hazard.road_section.name }}
+                </div>
+                {% endif %}
+                {% if hazard.point %}
+                <div class="text-muted small mb-2">
+                    点位：{{ hazard.point.code }} - {{ hazard.point.name }}
+                </div>
+                {% endif %}
+                <div class="mb-2">
+                    <span class="badge badge-passage-{{ hazard.passage_status }}">{{ hazard.get_passage_status_display }}</span>
+                    <span class="badge bg-secondary ms-1">{{ hazard.get_control_suggestion_display }}</span>
+                </div>
+                {% if hazard.description %}
+                <hr>
+                <div class="small text-muted">
+                    <strong>隐患描述：</strong><br>
+                    {{ hazard.description|linebreaks }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

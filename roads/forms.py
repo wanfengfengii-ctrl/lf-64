@@ -101,9 +101,10 @@ class PhotoForm(forms.ModelForm):
 class TaskOrderForm(forms.ModelForm):
     class Meta:
         model = TaskOrder
-        fields = ['inspection', 'point', 'title', 'description', 'priority', 'assigned_to', 'deadline']
+        fields = ['inspection', 'hazard', 'point', 'title', 'description', 'priority', 'assigned_to', 'deadline']
         widgets = {
             'inspection': forms.Select(attrs={'class': 'form-control'}),
+            'hazard': forms.Select(attrs={'class': 'form-control'}),
             'point': forms.Select(attrs={'class': 'form-control'}),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
